@@ -1,0 +1,89 @@
+name: talentshift-core
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-talentshift}
+      POSTGRES_USER: ${POSTGRES_USER:-talentshift}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-talentshift-local-password}
+    ports: ["5435:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-talentshift} -d ${POSTGRES_DB:-talentshift}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    image: talentshift-core:${IMAGE_TAG:-local}
+    build: {context: ., dockerfile: Dockerfile}
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-talentshift}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-talentshift}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-talentshift-local-password}
+      APP_DEMO_EMAIL: ${APP_DEMO_EMAIL:-demo@talentshift.local}
+      APP_DEMO_PASSWORD: ${APP_DEMO_PASSWORD:-ChangeThisDemoPassword123!}
+      APP_DEMO_USER_ENABLED: ${APP_DEMO_USER_ENABLED:-true}
+      APP_ADMIN_KEY: ${APP_ADMIN_KEY:-change-this-admin-key}
+      JOB_COLLECTION_ON_STARTUP: ${JOB_COLLECTION_ON_STARTUP:-true}
+      JOB_CONTINUOUS_POLL_MS: ${JOB_CONTINUOUS_POLL_MS:-60000}
+      ARBEITNOW_REFRESH_MINUTES: ${ARBEITNOW_REFRESH_MINUTES:-15}
+      REMOTIVE_REFRESH_MINUTES: ${REMOTIVE_REFRESH_MINUTES:-30}
+      SEED_REFRESH_MINUTES: ${SEED_REFRESH_MINUTES:-1440}
+      SEED_BACKFILL_REFRESH_MINUTES: ${SEED_BACKFILL_REFRESH_MINUTES:-15}
+      SEED_MAXIMUM_JOBS: ${SEED_MAXIMUM_JOBS:-1000}
+      JOB_EXPIRY_CRON: ${JOB_EXPIRY_CRON:-0 15 */3 * * *}
+      JOB_MAX_AGE_DAYS: ${JOB_MAX_AGE_DAYS:-45}
+      JOB_TARGET_MINIMUM: ${JOB_TARGET_MINIMUM:-4500}
+      JOB_CREDENTIAL_COLLECTORS_ENABLED: "false"
+      JOB_REGISTRY_GLOBAL_CONCURRENCY: ${JOB_REGISTRY_GLOBAL_CONCURRENCY:-24}
+      JOB_REGISTRY_PER_DOMAIN_CONCURRENCY: ${JOB_REGISTRY_PER_DOMAIN_CONCURRENCY:-2}
+      JOB_REGISTRY_BATCH_LIMIT: ${JOB_REGISTRY_BATCH_LIMIT:-2500}
+      AI_ENABLED: "false"
+      AI_PROVIDER: none
+      AI_GLOBAL_CONCURRENCY: ${AI_GLOBAL_CONCURRENCY:-24}
+      AI_PER_DOMAIN_CONCURRENCY: ${AI_PER_DOMAIN_CONCURRENCY:-2}
+      AI_BATCH_LIMIT: ${AI_BATCH_LIMIT:-2500}
+      APP_UPLOAD_DIR: /app/uploads
+      UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-5242880}
+    ports: ["8081:8081"]
+    volumes: ["uploads_data:/app/uploads"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  pgadmin:
+    image: dpage/pgadmin4:9.16
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-change-this-pgadmin-password}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports: ["5050:80"]
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1/misc/ping', timeout=5)
+      interval: 10s
+      timeout: 6s
+      retries: 20
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  uploads_data:

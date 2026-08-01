@@ -1,28 +1,125 @@
 spring:
-  application.name: talent-shift-integration-hub
+  application:
+    name: talentshift-core
   datasource:
-    url: ${HUB_DB_URL:jdbc:postgresql://localhost:5434/talent_shift_hub}
-    username: ${HUB_DB_USERNAME:hub}
-    password: ${HUB_DB_PASSWORD:hub}
-  jpa:
-    open-in-view: false
-    hibernate.ddl-auto: validate
-  flyway.enabled: true
-  jackson.serialization.write-dates-as-timestamps: false
-server.port: ${PORT:8081}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/talentshift}
+    username: ${SPRING_DATASOURCE_USERNAME:talentshift}
+    password: ${SPRING_DATASOURCE_PASSWORD:talentshift-local-password}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+  flyway:
+    enabled: true
+    validate-migration-naming: true
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 6MB
+  jackson:
+    default-property-inclusion: non_null
+  mvc:
+    problemdetails:
+      enabled: true
+  web:
+    resources:
+      # IntelliJ development: serve the latest React production build directly.
+      # Packaged deployments still fall back to the frontend copied into the jar.
+      static-locations: ${TALENTSHIFT_STATIC_LOCATIONS:file:./frontend/dist/,classpath:/static/}
+
+server:
+  port: ${SERVER_PORT:8081}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 springdoc:
-  swagger-ui.path: /swagger-ui.html
-hub:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+app:
   security:
-    username: ${HUB_USERNAME:admin}
-    password: ${HUB_PASSWORD:change-me}
-  imports:
-    page-size: ${HUB_IMPORT_PAGE_SIZE:100}
-  systems:
-    system-one: { base-url: "${SYSTEM_ONE_URL:}", auth-token: "${SYSTEM_ONE_TOKEN:}" }
-    system-two: { base-url: "${SYSTEM_TWO_URL:}", auth-token: "${SYSTEM_TWO_TOKEN:}" }
-    system-three: { base-url: "${SYSTEM_THREE_URL:}", auth-token: "${SYSTEM_THREE_TOKEN:}" }
-    masarjobs: { base-url: "${MASARJOBS_URL:http://localhost:8080}", auth-token: "${MASARJOBS_TOKEN:}" }
-  talent-shift:
-    base-url: "${TALENT_SHIFT_URL:}"
-    auth-token: "${TALENT_SHIFT_TOKEN:}"
+    demo-user-enabled: ${APP_DEMO_USER_ENABLED:false}
+    demo-email: ${APP_DEMO_EMAIL:demo@talentshift.local}
+    demo-password: ${APP_DEMO_PASSWORD:ChangeThisDemoPassword123!}
+    admin-key: ${APP_ADMIN_KEY:change-this-admin-key}
+    admin-user-enabled: ${APP_ADMIN_USER_ENABLED:false}
+    admin-email: ${APP_ADMIN_EMAIL:admin@talentshift.local}
+    admin-password: ${APP_ADMIN_PASSWORD:}
+    session-hours: ${APP_SESSION_HOURS:24}
+  jobs:
+    seed-candidate-csv: ${SEED_CANDIDATE_CSV:}
+    collection-on-startup: ${JOB_COLLECTION_ON_STARTUP:true}
+    continuous-poll-ms: ${JOB_CONTINUOUS_POLL_MS:60000}
+    continuous-initial-delay-ms: ${JOB_CONTINUOUS_INITIAL_DELAY_MS:60000}
+    arbeitnow-refresh-minutes: ${ARBEITNOW_REFRESH_MINUTES:15}
+    remotive-refresh-minutes: ${REMOTIVE_REFRESH_MINUTES:30}
+    seed-refresh-minutes: ${SEED_REFRESH_MINUTES:10}
+    seed-backfill-refresh-minutes: ${SEED_BACKFILL_REFRESH_MINUTES:10}
+    careers-discovery-poll-ms: ${CAREERS_DISCOVERY_POLL_MS:600000}
+    careers-discovery-initial-delay-ms: ${CAREERS_DISCOVERY_INITIAL_DELAY_MS:30000}
+    careers-discovery-batch-size: ${CAREERS_DISCOVERY_BATCH_SIZE:25}
+    web-seed-discovery-enabled: ${WEB_SEED_DISCOVERY_ENABLED:true}
+    web-seed-discovery-poll-ms: ${WEB_SEED_DISCOVERY_POLL_MS:5400000}
+    web-seed-discovery-initial-delay-ms: ${WEB_SEED_DISCOVERY_INITIAL_DELAY_MS:60000}
+    legacy-web-seed-discovery-enabled: ${LEGACY_WEB_SEED_DISCOVERY_ENABLED:false}
+    seed-maximum-jobs: ${SEED_MAXIMUM_JOBS:100000}
+    expiry-cron: ${JOB_EXPIRY_CRON:0 15 */3 * * *}
+    max-age-days: ${JOB_MAX_AGE_DAYS:45}
+    max-pages-per-source: ${JOB_MAX_PAGES_PER_SOURCE:3}
+    target-minimum: ${JOB_TARGET_MINIMUM:20000}
+    maximum-jobs: ${JOB_MAXIMUM_JOBS:0}
+    credential-collectors-enabled: ${JOB_CREDENTIAL_COLLECTORS_ENABLED:false}
+    jooble-api-key: ${JOOBLE_API_KEY:}
+    jooble-backfill-pages: ${JOOBLE_BACKFILL_PAGES:100}
+    jooble-refresh-pages: ${JOOBLE_REFRESH_PAGES:1}
+    jooble-request-budget: ${JOOBLE_REQUEST_BUDGET:500}
+    jooble-budget-reset-days: ${JOOBLE_BUDGET_RESET_DAYS:36500}
+    jooble-refresh-minutes: ${JOOBLE_REFRESH_MINUTES:180}
+    tavily-api-key: ${TAVILY_API_KEY:}
+    tavily-base-url: ${TAVILY_BASE_URL:https://api.tavily.com}
+    tavily-maximum-jobs: ${TAVILY_MAXIMUM_JOBS:2500}
+    tavily-new-job-search-credits: ${TAVILY_NEW_JOB_SEARCH_CREDITS:200}
+    tavily-seed-search-credits: ${TAVILY_SEED_SEARCH_CREDITS:200}
+    registry-concurrency: ${JOB_REGISTRY_CONCURRENCY:24}
+    registry-per-domain-concurrency: ${JOB_REGISTRY_PER_DOMAIN_CONCURRENCY:2}
+    registry-batch-limit: ${JOB_REGISTRY_BATCH_LIMIT:2500}
+    maximum-job-sources: ${JOB_MAXIMUM_SOURCES:10000}
+    source-health-refresh-ms: ${JOB_SOURCE_HEALTH_REFRESH_MS:5400000}
+    source-health-initial-delay-ms: ${JOB_SOURCE_HEALTH_INITIAL_DELAY_MS:900000}
+    http-max-response-bytes: ${JOB_HTTP_MAX_RESPONSE_BYTES:20971520}
+    http-max-redirects: ${JOB_HTTP_MAX_REDIRECTS:3}
+    browser-renderer-url: ${JOB_BROWSER_RENDERER_URL:http://127.0.0.1:3001/render}
+    verification-cron: ${JOB_VERIFICATION_CRON:0 0 12 * * *}
+    verification-zone: ${JOB_VERIFICATION_ZONE:Asia/Riyadh}
+    verification-concurrency: ${JOB_VERIFICATION_CONCURRENCY:8}
+    enrichment-poll-ms: ${JOB_ENRICHMENT_POLL_MS:60000}
+    enrichment-initial-delay-ms: ${JOB_ENRICHMENT_INITIAL_DELAY_MS:90000}
+    enrichment-batch-size: ${JOB_ENRICHMENT_BATCH_SIZE:100}
+    deduplication-poll-ms: ${JOB_DEDUPLICATION_POLL_MS:600000}
+    deduplication-initial-delay-ms: ${JOB_DEDUPLICATION_INITIAL_DELAY_MS:120000}
+  ai:
+    enabled: ${AI_ENABLED:false}
+    provider: ${AI_PROVIDER:none}
+    global-concurrency: ${AI_GLOBAL_CONCURRENCY:24}
+    per-domain-concurrency: ${AI_PER_DOMAIN_CONCURRENCY:2}
+    batch-limit: ${AI_BATCH_LIMIT:2500}
+    maximum-jobs: ${AI_MAXIMUM_JOBS:0}
+  storage:
+    upload-dir: ${APP_UPLOAD_DIR:uploads}
+    max-bytes: ${UPLOAD_MAX_BYTES:5242880}

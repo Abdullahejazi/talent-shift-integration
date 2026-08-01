@@ -1,0 +1,19 @@
+meta {
+  name: Upload and analyze CV
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/profile/cv
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  X-XSRF-TOKEN: {{csrfToken}}
+}
+
+body:multipart-form {
+  file: @file(/absolute/path/to/cv.pdf)
+}

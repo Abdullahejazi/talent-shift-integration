@@ -1,0 +1,20 @@
+meta {
+  name: Run job collector
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/admin/jobs/collect
+  body: none
+  auth: none
+}
+
+headers {
+  X-Admin-Key: {{adminKey}}
+  X-XSRF-TOKEN: {{csrfToken}}
+}
+
+assert {
+  res.status: eq 200
+}

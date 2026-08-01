@@ -1,109 +1,92 @@
-function getHeaders() {
-  const token = localStorage.getItem('auth_token');
-  if (!token) throw new Error('Not authenticated');
-  return {
-    'Authorization': 'Basic ' + token,
-    'Content-Type': 'application/json'
-  };
+let csrfToken = null;
+const adminKeyName = 'talentshift_admin_key';
+
+async function decode(response) {
+  const text = await response.text();
+  let body = null;
+  if (text) { try { body = JSON.parse(text); } catch { body = text; } }
+  if (!response.ok) throw new Error(body?.message || body?.detail || `Request failed (${response.status})`);
+  return body;
 }
 
-export function login(username, password) {
-  const token = btoa(`${username}:${password}`);
-  localStorage.setItem('auth_token', token);
+export async function request(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  const adminKey = localStorage.getItem(adminKeyName);
+  if (adminKey && (path.includes('/admin/') || path.includes('/integration/'))) headers['X-Admin-Key'] = adminKey;
+  const method = (options.method || 'GET').toUpperCase();
+  if (!['GET','HEAD','OPTIONS'].includes(method)) {
+    if (!csrfToken) {
+      const response = await fetch('/api/auth/csrf', { credentials: 'include' });
+      if (response.ok) csrfToken = await response.json();
+    }
+    if (csrfToken) headers[csrfToken.headerName] = csrfToken.token;
+  }
+  return decode(await fetch(path, { credentials: 'include', ...options, headers }));
 }
 
-export function logout() {
-  localStorage.removeItem('auth_token');
+export const setAdminKey = value => value ? localStorage.setItem(adminKeyName, value) : localStorage.removeItem(adminKeyName);
+export const getAdminKey = () => localStorage.getItem(adminKeyName) || '';
+export const isAuthenticated = () => sessionStorage.getItem('talentshift_authenticated') === 'true';
+export async function getMe() { return request('/api/auth/me'); }
+export async function login(email, password) {
+  const user = await request('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+  sessionStorage.setItem('talentshift_authenticated','true');
+  return user;
 }
+export async function logout() { try { await request('/api/auth/logout',{method:'POST'}); } finally { sessionStorage.removeItem('talentshift_authenticated'); csrfToken=null; } }
 
-export function isAuthenticated() {
-  return !!localStorage.getItem('auth_token');
-}
+const query = values => {
+  const params = new URLSearchParams();
+  Object.entries(values || {}).forEach(([k,v]) => { if (v !== '' && v !== null && v !== undefined) params.set(k,v); });
+  return params.toString();
+};
 
-export async function fetchImports() {
-  const res = await fetch('/api/v1/imports', { headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch imports');
-  return { content: await res.json() };
-}
+export const fetchJobs = filters => request(`/api/jobs?${query(filters)}`);
+export const fetchJobCount = () => request('/api/jobs/count');
+export const fetchRecommendedJobs = () => request('/api/jobs/recommended');
+export const fetchJob = id => request(`/api/jobs/${id}`);
+export const fetchCompanies = (keyword='') => request(`/api/companies?${query({keyword,page:0,size:100})}`);
+export const fetchCompany = slug => request(`/api/companies/${slug}`);
+export const fetchProfile = () => request('/api/profile');
+export const updateProfile = data => request('/api/profile',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+export const fetchSavedJobs = () => request('/api/workspace/saved-jobs');
+export const saveJob = id => request(`/api/workspace/saved-jobs/${id}`,{method:'POST'});
+export const unsaveJob = id => request(`/api/workspace/saved-jobs/${id}`,{method:'DELETE'});
+export const fetchApplications = () => request('/api/workspace/applications');
+export const trackApplication = id => request(`/api/workspace/applications/${id}`,{method:'POST'});
+export const updateApplication = (id,status) => request(`/api/workspace/applications/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+export const fetchMeetings = () => request('/api/workspace/meetings');
+export const createMeeting = data => request('/api/workspace/meetings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+export const deleteMeeting = id => request(`/api/workspace/meetings/${id}`,{method:'DELETE'});
+export const fetchConversations = () => request('/api/workspace/conversations');
+export const fetchMessages = id => request(`/api/workspace/conversations/${id}/messages`);
+export const sendMessage = (id,body) => request(`/api/workspace/conversations/${id}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body})});
+export const fetchAnalytics = () => request('/api/workspace/analytics');
+export const fetchPreferences = () => request('/api/workspace/preferences');
+export const updatePreferences = data => request('/api/workspace/preferences',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
 
-export async function triggerImport(systemKey) {
-  const res = await fetch('/api/v1/imports', { 
-    method: 'POST', 
-    headers: getHeaders(),
-    body: JSON.stringify({ systemKey })
-  });
-  if (!res.ok) throw new Error('Failed to start import');
-  return res.json();
-}
+export const fetchSources = () => request('/api/admin/job-sources');
+export const fetchOperations = () => request('/api/admin/job-sources/status');
+export const fetchDailyMetrics = () => request('/api/admin/job-sources/daily-metrics');
+export const fetchDiscoveryHistory = () => request('/api/admin/job-sources/discovery-history');
+export const collectJobs = () => request('/api/admin/jobs/collect',{method:'POST'});
+export const recheckSources = () => request('/api/admin/job-sources/recheck',{method:'POST'});
+export const discoverCareers = () => request('/api/admin/job-sources/discover-careers',{method:'POST'});
+export const toggleSource = (id,enabled) => request(`/api/admin/job-sources/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});
 
-export async function triggerMockImport() {
-  const res = await fetch('/api/v1/imports/mock', { method: 'POST', headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to trigger mock import');
-  return res.json();
-}
-
-export async function fetchCanonicalJobs(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  const res = await fetch(`/api/v1/canonical/jobs${query ? `?${query}` : ''}`, { headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch jobs');
-  return { content: await res.json() };
-}
-
-export async function fetchCanonicalSources(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  const res = await fetch(`/api/v1/canonical/sources${query ? `?${query}` : ''}`, { headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch sources');
-  return { content: await res.json() };
-}
-
-export async function fetchPendingReviews() {
-  const res = await fetch('/api/v1/reviews?status=PENDING', { headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch reviews');
-  return { content: await res.json() };
-}
-
-export async function approveReview(id) {
-  const res = await fetch(`/api/v1/reviews/${id}/approve`, { method: 'POST', headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to approve');
-}
-
-export async function rejectReview(id) {
-  const res = await fetch(`/api/v1/reviews/${id}/reject`, { method: 'POST', headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to reject');
-}
-
-export async function updateSourceType(id, type) {
-  const res = await fetch(`/api/v1/canonical/sources/${id}/type`, {
-    method: 'PATCH',
-    headers: getHeaders(),
-    body: JSON.stringify({ type })
-  });
-  if (!res.ok) throw new Error('Failed to update source type');
-}
-
-export async function fetchAuditLogs() {
-  const res = await fetch('/api/v1/audit', { headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch audit logs');
-  return { content: await res.json() };
-}
-
-export async function fetchMergeHistory() {
-  const res = await fetch('/api/v1/canonical/merges', { headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch merges');
-  return { content: await res.json() };
-}
-
-export async function reverseMerge(id, reason) {
-  const res = await fetch(`/api/v1/canonical/merges/${id}/reverse`, { 
-    method: 'POST', 
-    headers: getHeaders(),
-    body: JSON.stringify({ reason })
-  });
-  if (!res.ok) throw new Error('Failed to reverse merge');
-}
-
-export async function fetchSemanticJobs(q) {
-  const res = await fetch(`/api/v1/canonical/jobs/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() });
-  if (!res.ok) throw new Error('Failed to perform semantic search');
-  return { content: await res.json() };
-}
+export const fetchSystems = () => request('/api/integration/connected-systems');
+export const fetchImports = () => request('/api/integration/imports');
+export const fetchRawJobs = () => request('/api/integration/raw/jobs');
+export const fetchLineage = () => request('/api/integration/lineage');
+export const fetchReviews = status => request(`/api/integration/reviews?${query({status})}`);
+export const decideReview = (id,decision,note='') => request(`/api/integration/reviews/${id}/${decision}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note})});
+export const fetchCheckpoints = () => request('/api/integration/checkpoints');
+export const fetchOutbox = () => request('/api/integration/outbox');
+export const fetchAttempts = id => request(`/api/integration/outbox/${id}/attempts`);
+export const retryOutbox = id => request(`/api/integration/outbox/${id}/retry`,{method:'POST'});
+export const sendReady = () => request('/api/integration/outbox/send-ready',{method:'POST'});
+export const enqueueJob = id => request(`/api/integration/outbox/jobs/${id}`,{method:'POST'});
+export const fetchAudit = () => request('/api/integration/audit');
+export const fetchMerges = () => request('/api/integration/merges');
+export const fetchAiStatus = () => request('/api/integration/ai/status');
+export const runAiDiscovery = mode => request('/api/integration/ai/discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode})});

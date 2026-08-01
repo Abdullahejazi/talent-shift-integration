@@ -41,6 +41,7 @@ public class ApiController {
     @GetMapping("/outbox/{id}/attempts") public List<Map<String,Object>> attempts(@PathVariable UUID id){return db.queryForList("select * from transfer_attempt where outbox_id=? order by attempt_number",id);}
     @PostMapping("/outbox/{id}/retry") public void retry(@PathVariable UUID id){transfers.retry(id);}
     @PostMapping("/outbox/send-ready") public Map<String,Object> send(@RequestParam(defaultValue="100") @Max(500) int limit){return Map.of("processed",transfers.sendReady(limit));}
+    @GetMapping("/stats/sources-by-type") public List<Map<String,Object>> sourcesByType(){return rows("select source_type, count(*) as count from canonical_source group by source_type order by count desc", 100);}
     private List<Map<String,Object>> rows(String sql,int limit){return db.queryForList(sql,limit);}
     public record StartImport(@NotBlank String systemKey){}
     public record ReviewRequest(@Size(max=2000) String note){}

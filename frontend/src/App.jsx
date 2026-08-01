@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sun, Moon, Filter, X, Search } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
@@ -12,29 +14,51 @@ import {
 import './index.css';
 
 const SOURCE_TYPES = [
-  { id: 1, name: 'مواقع الشركات الرسمية (Official company websites)' },
-  { id: 2, name: 'المنصة الوطنية الموحدة للتوظيف - جدارات' },
-  { id: 3, name: 'منصات التوظيف الإقليمية (Regional platforms)' },
-  { id: 4, name: 'صفحات وظائف الشركات (LinkedIn Jobs, etc)' },
-  { id: 5, name: 'مواقع التوظيف العالمية (Global platforms)' },
-  { id: 6, name: 'مواقع المشاريع الكبرى والجهات شبه الحكومية (Mega projects)' },
-  { id: 7, name: 'مواقع الجهات الحكومية والهيئات (Government entities)' },
-  { id: 8, name: 'منصات التوظيف الحكومية المتخصصة (Specialized gov platforms)' },
-  { id: 9, name: 'مواقع شركات التوظيف والاستقطاب (Recruitment agencies)' },
-  { id: 10, name: 'حسابات التواصل الاجتماعي المتخصصة بالتوظيف (Social media)' },
-  { id: 11, name: 'مواقع الجامعات ومراكز الخريجين (Universities)' },
-  { id: 12, name: 'معارض التوظيف والفعاليات المهنية (Career fairs)' },
-  { id: 13, name: 'النشرات البريدية والتنبيهات (Newsletters)' },
-  { id: 14, name: 'غرف التجارة والجمعيات المهنية (Chambers of commerce)' },
-  { id: 15, name: 'مواقع Applicant Tracking Systems - ATS' },
-  { id: 16, name: 'إعلانات الصحف والمواقع الإخبارية (Newspapers)' },
-  { id: 17, name: 'العلاقات المباشرة مع الشركات (Direct relationships)' },
-  { id: 18, name: 'برامج التدريب المنتهي بالتوظيف (Bootcamps/Training)' }
+  { id: 1, code: 'OFFICIAL_COMPANY_CAREER_WEBSITES', name: 'مواقع الشركات الرسمية (Official company websites)' },
+  { id: 2, code: 'NATIONAL_UNIFIED_EMPLOYMENT_PLATFORM', name: 'المنصة الوطنية الموحدة للتوظيف - جدارات' },
+  { id: 3, code: 'REGIONAL_EMPLOYMENT_PLATFORMS', name: 'منصات التوظيف الإقليمية (Regional platforms)' },
+  { id: 4, code: 'LINKEDIN_JOBS', name: 'صفحات وظائف الشركات (LinkedIn Jobs, etc)' },
+  { id: 5, code: 'GLOBAL_JOB_SITES', name: 'مواقع التوظيف العالمية (Global platforms)' },
+  { id: 6, code: 'MAJOR_PROJECTS_AND_SEMI_GOVERNMENT_ENTITY_WEBSITES', name: 'مواقع المشاريع الكبرى والجهات شبه الحكومية (Mega projects)' },
+  { id: 7, code: 'GOVERNMENT_ENTITY_AND_AUTHORITY_WEBSITES', name: 'مواقع الجهات الحكومية والهيئات (Government entities)' },
+  { id: 8, code: 'SPECIALIZED_GOVERNMENT_EMPLOYMENT_PLATFORMS', name: 'منصات التوظيف الحكومية المتخصصة (Specialized gov platforms)' },
+  { id: 9, code: 'RECRUITMENT_AND_STAFFING_COMPANY_WEBSITES', name: 'مواقع شركات التوظيف والاستقطاب (Recruitment agencies)' },
+  { id: 10, code: 'SPECIALIZED_PROFESSIONAL_SOCIAL_MEDIA_ACCOUNTS', name: 'حسابات التواصل الاجتماعي المتخصصة بالتوظيف (Social media)' },
+  { id: 11, code: 'UNIVERSITY_AND_CAREER_CENTER_WEBSITES', name: 'مواقع الجامعات ومراكز الخريجين (Universities)' },
+  { id: 12, code: 'CAREER_FAIRS_AND_RECRUITMENT_EVENTS', name: 'معارض التوظيف والفعاليات المهنية (Career fairs)' },
+  { id: 13, code: 'EMAIL_NEWSLETTERS_AND_JOB_ALERTS', name: 'النشرات البريدية والتنبيهات (Newsletters)' },
+  { id: 14, code: 'CHAMBERS_OF_COMMERCE_AND_PROFESSIONAL_ASSOCIATIONS', name: 'غرف التجارة والجمعيات المهنية (Chambers of commerce)' },
+  { id: 15, code: 'APPLICANT_TRACKING_SYSTEMS', name: 'مواقع Applicant Tracking Systems - ATS' },
+  { id: 16, code: 'NEWSPAPERS_AND_LOCAL_WEBSITES', name: 'إعلانات الصحف والمواقع الإخبارية (Newspapers)' },
+  { id: 17, code: 'DIRECT_COMPANY_ANNOUNCEMENTS', name: 'العلاقات المباشرة مع الشركات (Direct relationships)' },
+  { id: 18, code: 'INTERNSHIP_AND_GRADUATE_PROGRAM_PORTALS', name: 'برامج التدريب المنتهي بالتوظيف (Bootcamps/Training)' }
 ];
+
+function AnimatedBackground() {
+  return (
+    <div className="aurora-container">
+      <div className="aurora-blob" style={{ background: 'var(--primary)', width: '600px', height: '600px', top: '-10%', left: '-10%', animationDelay: '0s' }} />
+      <div className="aurora-blob" style={{ background: 'var(--secondary)', width: '500px', height: '500px', bottom: '-20%', right: '-10%', animationDelay: '-5s' }} />
+      <div className="aurora-blob" style={{ background: 'var(--accent)', width: '400px', height: '400px', top: '40%', left: '40%', animationDelay: '-10s' }} />
+    </div>
+  );
+}
+
+const pageVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.3, ease: 'easeIn' } }
+};
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [authenticated, setAuthenticated] = useState(checkAuth());
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   if (!authenticated) {
     return <Login onLogin={() => setAuthenticated(true)} />;
@@ -47,6 +71,7 @@ function App() {
 
   return (
     <div id="root">
+      <AnimatedBackground />
       <div className="sidebar">
         <div>
           <h2>Integrations</h2>
@@ -74,18 +99,35 @@ function App() {
           </div>
         </nav>
         
-        <div style={{ marginTop: 'auto' }}>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <button 
+            className="btn" 
+            style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }} 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            {theme === 'dark' ? <><Sun size={18} /> Light Mode</> : <><Moon size={18} /> Dark Mode</>}
+          </button>
           <button className="btn btn-danger" style={{ width: '100%' }} onClick={handleLogout}>Log Out</button>
         </div>
       </div>
 
       <div className="main-content">
-        {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'sources' && <Explorer type="sources" />}
-        {activeTab === 'jobs' && <Explorer type="jobs" />}
-        {activeTab === 'reviews' && <ReviewHub />}
-        {activeTab === 'merges' && <MergeHistory />}
-        {activeTab === 'audit' && <AuditLogs />}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            {activeTab === 'dashboard' && <Dashboard />}
+            {activeTab === 'sources' && <Explorer type="sources" />}
+            {activeTab === 'jobs' && <Explorer type="jobs" />}
+            {activeTab === 'reviews' && <ReviewHub />}
+            {activeTab === 'merges' && <MergeHistory />}
+            {activeTab === 'audit' && <AuditLogs />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -186,7 +228,7 @@ function Dashboard() {
   const typeCounts = useMemo(() => {
     return SOURCE_TYPES.map(type => ({
       ...type,
-      count: sources.filter(s => (s.source_type || 1) === type.id).length
+      count: sources.filter(s => s.source_type === type.code).length
     })).filter(t => t.count > 0);
   }, [sources]);
 
@@ -224,7 +266,7 @@ function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="id" stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)' }} />
               <YAxis stroke="var(--text-muted)" tick={{ fill: 'var(--text-muted)' }} />
-              <RechartsTooltip cursor={{ fill: 'var(--surface-light)' }} contentStyle={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px' }} />
+              <RechartsTooltip cursor={{ fill: 'var(--surface-light)' }} labelFormatter={(value, name, props) => props[0]?.payload?.name || value} contentStyle={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px' }} />
               <Bar dataKey="count" fill="var(--primary)" radius={[4, 4, 0, 0]} name="Source Count" />
             </BarChart>
           </ResponsiveContainer>
@@ -335,6 +377,7 @@ function Explorer({ type }) {
   const [searchLocation, setSearchLocation] = useState(''); // Only for jobs
   const [searchTitle, setSearchTitle] = useState(''); // Added Job Title search
   const [offlineOnly, setOfflineOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Expanded row state
   const [expandedSourceId, setExpandedSourceId] = useState(null);
@@ -418,50 +461,103 @@ function Explorer({ type }) {
 
   return (
     <div>
-      <h1>Canonical {type === 'sources' ? 'Sources' : 'Jobs'}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1 style={{ margin: 0 }}>Canonical {type === 'sources' ? 'Sources' : 'Jobs'}</h1>
+        <button className="btn btn-primary" onClick={() => setShowFilters(true)}>
+          <Filter size={18} /> Advanced Filters
+        </button>
+      </div>
       
+      {/* Search Bar - Main inline area */}
       <div className="card" style={{ marginBottom: '2rem', background: 'var(--surface-light)' }}>
         <form onSubmit={loadData} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '200px', maxWidth: '300px' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Company/Organization</label>
-            <input type="text" placeholder="Search by name..." value={searchOrg} onChange={e => setSearchOrg(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-main)' }} />
+          <div style={{ flex: 1, minWidth: '300px' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              {type === 'sources' ? 'Company Name' : 'Job Title (AI Semantic Search)'}
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input 
+                type="text" 
+                placeholder={type === 'sources' ? "Search by company..." : "e.g. software, chef..."} 
+                value={type === 'sources' ? searchOrg : searchTitle} 
+                onChange={e => type === 'sources' ? setSearchOrg(e.target.value) : setSearchTitle(e.target.value)} 
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem' }} 
+              />
+              <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            </div>
           </div>
-          
-          {type === 'sources' ? (
-            <>
-              <div style={{ flex: 1, minWidth: '200px', maxWidth: '300px' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Domain</label>
-                <input type="text" placeholder="e.g. linkedin.com" value={searchDomain} onChange={e => setSearchDomain(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-main)' }} />
-              </div>
-              <div style={{ flex: 1, minWidth: '200px', maxWidth: '300px' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Source Type</label>
-                <select value={searchType} onChange={e => setSearchType(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-main)' }}>
-                  <option value="">All Types</option>
-                  {SOURCE_TYPES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
-                </select>
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ flex: 1, minWidth: '200px', maxWidth: '300px' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Job Title / Keywords</label>
-                <input type="text" placeholder="e.g. software, chef..." value={searchTitle} onChange={e => setSearchTitle(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-main)' }} />
-              </div>
-              <div style={{ flex: 1, minWidth: '200px', maxWidth: '300px' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Location</label>
-                <input type="text" placeholder="e.g. Riyadh" value={searchLocation} onChange={e => setSearchLocation(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-main)' }} />
-              </div>
-            </>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.5rem', cursor: 'pointer' }} onClick={() => setOfflineOnly(!offlineOnly)}>
-            <input type="checkbox" checked={offlineOnly} readOnly style={{ cursor: 'pointer' }} />
-            <label style={{ cursor: 'pointer', color: 'var(--danger)' }}>Show Offline Only</label>
-          </div>
-
-          <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1.5rem' }}>Search</button>
+          <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }}>Search</button>
         </form>
       </div>
+
+      {/* Advanced Filter Slide-Over Panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div 
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            style={{
+              position: 'fixed',
+              top: 0, right: 0, bottom: 0,
+              width: '350px',
+              background: 'var(--bg-main)',
+              borderLeft: '1px solid var(--border-color)',
+              boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
+              zIndex: 50,
+              padding: '2rem'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ margin: 0 }}>Filters</h2>
+              <button onClick={() => setShowFilters(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Organization</label>
+                <input type="text" value={searchOrg} onChange={e => setSearchOrg(e.target.value)} placeholder="Company Name" style={{ width: '100%' }} />
+              </div>
+              
+              {type === 'sources' && (
+                <>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Domain</label>
+                    <input type="text" value={searchDomain} onChange={e => setSearchDomain(e.target.value)} placeholder="e.g. linkedin.com" style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Source Type</label>
+                    <select value={searchType} onChange={e => setSearchType(e.target.value)} style={{ width: '100%' }}>
+                      <option value="">All Types</option>
+                      {SOURCE_TYPES.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {type === 'jobs' && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Location</label>
+                  <input type="text" value={searchLocation} onChange={e => setSearchLocation(e.target.value)} placeholder="e.g. Riyadh" style={{ width: '100%' }} />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', cursor: 'pointer' }} onClick={() => setOfflineOnly(!offlineOnly)}>
+                <input type="checkbox" checked={offlineOnly} readOnly style={{ cursor: 'pointer' }} />
+                <label style={{ cursor: 'pointer', color: 'var(--danger)' }}>Show Offline Data Only</label>
+              </div>
+
+              <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
+                <button className="btn" style={{ flex: 1, background: 'var(--bg-input)' }} onClick={() => setShowFilters(false)}>Cancel</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={(e) => { loadData(e); setShowFilters(false); }}>Apply Filters</button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="table-container">
         <table>

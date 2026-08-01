@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: talent_shift_hub
+      POSTGRES_USER: hub
+      POSTGRES_PASSWORD: hub
+    ports: ["5434:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hub -d talent_shift_hub"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

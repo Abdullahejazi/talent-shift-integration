@@ -1,0 +1,28 @@
+spring:
+  application.name: talent-shift-integration-hub
+  datasource:
+    url: ${HUB_DB_URL:jdbc:postgresql://localhost:5434/talent_shift_hub}
+    username: ${HUB_DB_USERNAME:hub}
+    password: ${HUB_DB_PASSWORD:hub}
+  jpa:
+    open-in-view: false
+    hibernate.ddl-auto: validate
+  flyway.enabled: true
+  jackson.serialization.write-dates-as-timestamps: false
+server.port: ${PORT:8081}
+springdoc:
+  swagger-ui.path: /swagger-ui.html
+hub:
+  security:
+    username: ${HUB_USERNAME:admin}
+    password: ${HUB_PASSWORD:change-me}
+  imports:
+    page-size: ${HUB_IMPORT_PAGE_SIZE:100}
+  systems:
+    system-one: { base-url: "${SYSTEM_ONE_URL:}", auth-token: "${SYSTEM_ONE_TOKEN:}" }
+    system-two: { base-url: "${SYSTEM_TWO_URL:}", auth-token: "${SYSTEM_TWO_TOKEN:}" }
+    system-three: { base-url: "${SYSTEM_THREE_URL:}", auth-token: "${SYSTEM_THREE_TOKEN:}" }
+    masarjobs: { base-url: "${MASARJOBS_URL:http://localhost:8080}", auth-token: "${MASARJOBS_TOKEN:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJoZWphemlhYmR1bGxhaEBnbWFpbC5jb20iLCJyb2xlcyI6WyJBRE1JTiJdLCJpc3MiOiJtYXNhcmpvYnMtYmFja2VuZCIsImV4cCI6MTc4NTM0NTE0MCwiaWF0IjoxNzg1MzM3OTQwLCJ1c2VySWQiOiIyIiwianRpIjoiZTY4ZGQ2YTEtZjZlOS00MWUwLWI3Y2MtMWRjZGY1MzE5ZjRjIn0.n73ai6VcBbwTqk2O-tZc4J-t-TOFKi-0SENs7sdu63A}" }
+  talent-shift:
+    base-url: "${TALENT_SHIFT_URL:}"
+    auth-token: "${TALENT_SHIFT_TOKEN:}"

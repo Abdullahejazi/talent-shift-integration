@@ -1,0 +1,188 @@
+name: TalentShift Core CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, rebuild/talentshift-core-mvp]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run automated tests and package
+        shell: bash
+        run: |
+          mkdir -p build/ci
+          set -o pipefail
+          mvn -B -ntp clean verify 2>&1 | tee build/ci/maven-verify.log
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: core-verification-reports
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            build/ci/maven-verify.log
+            target/surefire-reports/
+            target/failsafe-reports/
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+      - name: Build production image
+        run: docker build -t talentshift-core:ci .
+
+      - name: Start application, PostgreSQL, and pgAdmin
+        env:
+          IMAGE_TAG: ci
+          POSTGRES_PASSWORD: ci-postgres-password
+          APP_ADMIN_KEY: ci-collector-key
+          JOB_COLLECTION_ON_STARTUP: "false"
+          PGADMIN_DEFAULT_EMAIL: admin@example.com
+          PGADMIN_DEFAULT_PASSWORD: ci-pgadmin-password
+        run: docker compose up --detach --no-build postgres app pgadmin
+
+      - name: Verify frontend, Swagger, and pgAdmin
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              docker compose logs app postgres pgadmin | tee build/ci/topology.log
+              exit 1
+            fi
+            sleep 3
+          done
+
+          curl --fail --silent --show-error http://127.0.0.1:8080/ > build/ci/frontend.html
+          grep --quiet "TalentShift" build/ci/frontend.html
+
+          curl --fail --silent --show-error http://127.0.0.1:8080/v3/api-docs > build/ci/openapi.json
+          python3 - <<'PY'
+          import json
+          document = json.load(open('build/ci/openapi.json'))
+          if not str(document.get('openapi', '')).startswith('3.'):
+              raise SystemExit('OpenAPI document is missing or invalid')
+          if '/api/jobs' not in document.get('paths', {}):
+              raise SystemExit('Jobs API is missing from the OpenAPI document')
+          print('OpenAPI and jobs endpoint verified')
+          PY
+
+          curl --fail --silent --show-error --location \
+            http://127.0.0.1:8080/swagger-ui.html > build/ci/swagger-ui.html
+          grep --quiet "swagger" build/ci/swagger-ui.html
+
+          for attempt in {1..40}; do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:5050/misc/ping >/dev/null; then
+              printf 'HTTP 200\n' > build/ci/pgadmin-ping.txt
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              docker compose logs pgadmin | tee -a build/ci/topology.log
+              exit 1
+            fi
+            sleep 3
+          done
+          grep --quiet "HTTP 200" build/ci/pgadmin-ping.txt
+
+      - name: Verify live job collection and persistence
+        shell: bash
+        env:
+          APP_ADMIN_KEY: ci-collector-key
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error \
+            --cookie-jar build/ci/cookies.txt \
+            --dump-header build/ci/csrf-response.headers \
+            http://127.0.0.1:8080/api/auth/csrf > build/ci/csrf.json
+          CSRF_TOKEN=$(python3 -c 'import json; print(json.load(open("build/ci/csrf.json"))["token"])')
+
+          HTTP_STATUS=$(curl --silent --show-error \
+            --cookie build/ci/cookies.txt \
+            --header "X-XSRF-TOKEN: ${CSRF_TOKEN}" \
+            --header "X-Admin-Key: ${APP_ADMIN_KEY}" \
+            --request POST \
+            --dump-header build/ci/collection-response.headers \
+            --output build/ci/collection.json \
+            --write-out '%{http_code}' \
+            http://127.0.0.1:8080/api/admin/jobs/collect)
+          printf '%s\n' "$HTTP_STATUS" > build/ci/collection-status.txt
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            docker compose logs app postgres > build/ci/topology.log
+            echo "Collector endpoint returned HTTP ${HTTP_STATUS}"
+            cat build/ci/collection-response.headers || true
+            cat build/ci/collection.json || true
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          result = json.load(open('build/ci/collection.json'))
+          processed = int(result.get('inserted', 0)) + int(result.get('updated', 0))
+          failed = result.get('failedSources', [])
+          if len(failed) >= 3:
+              raise SystemExit(f'Every configured source failed: {result}')
+          print(f'Collector processed {processed} Saudi-eligible jobs; failed sources: {failed}')
+          PY
+
+          curl --fail --silent http://127.0.0.1:8080/api/jobs/count > build/ci/job-count.json
+          python3 - <<'PY'
+          import json
+          result = json.load(open('build/ci/job-count.json'))
+          if int(result.get('targetMinimum', 0)) != 4000:
+              raise SystemExit(f'Job target is not configured correctly: {result}')
+          print(f'Persisted active Saudi jobs: {result["count"]}; target: {result["targetMinimum"]}')
+          PY
+
+      - name: Upload environment and collection evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: live-environment-evidence
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            build/ci/frontend.html
+            build/ci/openapi.json
+            build/ci/swagger-ui.html
+            build/ci/pgadmin-ping.txt
+            build/ci/csrf.json
+            build/ci/csrf-response.headers
+            build/ci/collection-status.txt
+            build/ci/collection-response.headers
+            build/ci/collection.json
+            build/ci/job-count.json
+            build/ci/topology.log
+
+      - name: Stop application topology
+        if: always()
+        env:
+          IMAGE_TAG: ci
+        run: docker compose down --volumes --remove-orphans

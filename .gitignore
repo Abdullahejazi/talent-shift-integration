@@ -7,4 +7,11 @@ application-local.yml
 data/
 frontend/node_modules/
 frontend/dist/
+frontend/node/
 *.csv
+*.log
+node_modules/
+dist/
+uploads/
+.codex-tmp/
+outputs/

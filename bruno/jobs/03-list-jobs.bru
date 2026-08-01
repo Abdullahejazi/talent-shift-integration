@@ -1,0 +1,16 @@
+meta {
+  name: List and filter jobs
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/jobs?keyword=java&remote=true&page=0&size=20
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.items: isArray
+}

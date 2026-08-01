@@ -1,0 +1,27 @@
+meta {
+  name: Candidate login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-XSRF-TOKEN: {{csrfToken}}
+}
+
+body:json {
+  {
+    "email": "{{demoEmail}}",
+    "password": "{{demoPassword}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

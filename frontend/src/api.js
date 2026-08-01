@@ -33,6 +33,14 @@ export async function login(email, password) {
   sessionStorage.setItem('talentshift_authenticated','true');
   return user;
 }
+export async function register(fullName, email, password) {
+  const user = await request('/api/auth/register', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({role:'CANDIDATE',fullName,email,password})
+  });
+  sessionStorage.setItem('talentshift_authenticated','true');
+  return user;
+}
 export async function logout() { try { await request('/api/auth/logout',{method:'POST'}); } finally { sessionStorage.removeItem('talentshift_authenticated'); csrfToken=null; } }
 
 const query = values => {

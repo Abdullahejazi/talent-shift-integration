@@ -299,6 +299,35 @@ function Dashboard() {
         </div>
       </div>
 
+      <h2>Sources per Type</h2>
+      <div className="card" style={{ padding: '0', overflow: 'hidden', marginBottom: '2rem' }}>
+        <table style={{ margin: 0 }}>
+          <thead>
+            <tr>
+              <th>Source Type</th>
+              <th style={{ textAlign: 'right' }}>Number of Sources</th>
+            </tr>
+          </thead>
+          <tbody>
+            {typeCounts.map(stat => (
+              <tr key={stat.id}>
+                <td style={{ fontWeight: '500' }}>{stat.name}</td>
+                <td style={{ textAlign: 'right' }}>
+                  <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)', border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '0.85rem' }}>
+                    {stat.count}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {typeCounts.length === 0 && (
+              <tr>
+                <td colSpan="2" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No types found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
       <h2>Jobs per Source</h2>
       <div className="card" style={{ padding: '0', overflow: 'hidden', marginBottom: '2rem' }}>
         <table style={{ margin: 0 }}>

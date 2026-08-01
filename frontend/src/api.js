@@ -1,5 +1,4 @@
 let csrfToken = null;
-const adminKeyName = 'talentshift_admin_key';
 
 async function decode(response) {
   const text = await response.text();
@@ -11,8 +10,6 @@ async function decode(response) {
 
 export async function request(path, options = {}) {
   const headers = { ...(options.headers || {}) };
-  const adminKey = localStorage.getItem(adminKeyName);
-  if (adminKey && (path.includes('/admin/') || path.includes('/integration/'))) headers['X-Admin-Key'] = adminKey;
   const method = (options.method || 'GET').toUpperCase();
   if (!['GET','HEAD','OPTIONS'].includes(method)) {
     if (!csrfToken) {
@@ -24,8 +21,6 @@ export async function request(path, options = {}) {
   return decode(await fetch(path, { credentials: 'include', ...options, headers }));
 }
 
-export const setAdminKey = value => value ? localStorage.setItem(adminKeyName, value) : localStorage.removeItem(adminKeyName);
-export const getAdminKey = () => localStorage.getItem(adminKeyName) || '';
 export const isAuthenticated = () => sessionStorage.getItem('talentshift_authenticated') === 'true';
 export async function getMe() { return request('/api/auth/me'); }
 export async function login(email, password) {
@@ -78,6 +73,8 @@ export const fetchOperations = () => request('/api/admin/job-sources/status');
 export const fetchDailyMetrics = () => request('/api/admin/job-sources/daily-metrics');
 export const fetchDiscoveryHistory = () => request('/api/admin/job-sources/discovery-history');
 export const collectJobs = () => request('/api/admin/jobs/collect',{method:'POST'});
+export const searchNewJobs = () => request('/api/admin/jobs/agent-search',{method:'POST'});
+export const searchSeedJobs = () => request('/api/admin/jobs/agent-seed-search',{method:'POST'});
 export const recheckSources = () => request('/api/admin/job-sources/recheck',{method:'POST'});
 export const discoverCareers = () => request('/api/admin/job-sources/discover-careers',{method:'POST'});
 export const toggleSource = (id,enabled) => request(`/api/admin/job-sources/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});

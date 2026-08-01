@@ -92,7 +92,8 @@ An authorized discovery agent can submit jobs found on other public sources in b
 
 ```http
 POST /api/admin/jobs/ingest
-X-Admin-Key: <APP_ADMIN_KEY>
+Cookie: TS_SESSION=<administrator-session>
+X-XSRF-TOKEN: <csrf-token>
 Content-Type: application/json
 
 {"jobs":[{"source":"PUBLIC_SOURCE","externalId":"123","title":"Java Engineer","company":"Example","location":"Riyadh, Saudi Arabia","applyUrl":"https://employer.example/jobs/123"}]}
@@ -108,17 +109,18 @@ Manual collection:
 
 ```http
 POST /api/admin/jobs/collect
-X-Admin-Key: <APP_ADMIN_KEY>
+Cookie: TS_SESSION=<administrator-session>
+X-XSRF-TOKEN: <csrf-token>
 ```
 
 Operational source status and fetch totals:
 
 ```http
 GET /api/admin/job-sources
-X-Admin-Key: <APP_ADMIN_KEY>
+Cookie: TS_SESSION=<administrator-session>
 ```
 
-The admin collection and ingestion endpoints are machine endpoints protected by a constant-time checked admin key, so they do not use browser-cookie CSRF tokens.
+All administration and integration endpoints require the single authenticated administrator account. Candidate accounts are denied at the server even if they call those URLs directly, and state-changing administrator requests require CSRF protection.
 
 ## pgAdmin
 
@@ -149,10 +151,12 @@ The integration test uses a disposable PostgreSQL Testcontainer and applies the 
 - Parameterized SQL through Spring JDBC
 - File size, extension, filename, and path validation for CV uploads
 - Job descriptions rendered as text rather than executable HTML
-- Constant-time admin-key comparison
+- Server-enforced candidate/administrator role separation and a database constraint allowing only one administrator
 - Environment-based secrets
 
 Local demo sign-in is controlled by `APP_DEMO_USER_ENABLED`. When enabled, the configured demo password is synchronized at startup, so changing `.env` no longer leaves an old password in the database. Disable the demo user in production and set `COOKIE_SECURE=true` behind HTTPS.
+
+Create or rotate the one administrator account at startup with `APP_ADMIN_USER_ENABLED=true`, `APP_ADMIN_EMAIL`, and `APP_ADMIN_PASSWORD`. The database permits only one row with the `ADMIN` role; later startup configuration updates that same account rather than creating another administrator.
 
 ## Architecture
 

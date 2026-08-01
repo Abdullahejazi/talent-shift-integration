@@ -6,7 +6,7 @@ TalentShift is designed around OWASP ASVS-style application controls and the NIS
 
 - BCrypt password hashing with cost 12; opaque random session tokens are stored only as SHA-256 hashes.
 - HttpOnly, SameSite session cookies; secure cookies are supported with `COOKIE_SECURE=true`.
-- CSRF tokens on state-changing browser requests and a restrictive Content Security Policy. Machine-only job collection and ingestion use `X-Admin-Key` instead of browser cookies and are excluded from CSRF processing.
+- CSRF tokens on every state-changing browser request and a restrictive Content Security Policy. Administrative and integration APIs require the single authenticated `ADMIN` account; candidate sessions and standalone keys cannot access them.
 - Generic login errors and per-IP/email login throttling.
 - Parameterized database access, validated pagination limits, and HTTP(S)-only outbound job links.
 - Source attribution, Saudi relevance filtering, duplicate prevention, and stale-listing retirement.
@@ -15,7 +15,7 @@ TalentShift is designed around OWASP ASVS-style application controls and the NIS
 
 ## Production requirements
 
-- Disable `APP_DEMO_USER_ENABLED`, replace every example secret, and set `COOKIE_SECURE=true` behind HTTPS.
+- Disable `APP_DEMO_USER_ENABLED`, enable the administrator with `APP_ADMIN_USER_ENABLED=true`, provide a unique strong `APP_ADMIN_PASSWORD` through a secret store, and set `COOKIE_SECURE=true` behind HTTPS.
 - Restrict Swagger/OpenAPI and management endpoints to operators or disable them publicly.
 - Put the application behind a trusted reverse proxy with request limits and centralized rate limiting.
 - Use a managed secret store, encrypted backups, database least privilege, log monitoring, dependency scanning, and an incident-response process.

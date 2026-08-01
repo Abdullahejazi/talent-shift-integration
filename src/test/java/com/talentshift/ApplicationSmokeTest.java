@@ -26,7 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @TestPropertySource(properties={"app.jobs.collection-on-startup=false","app.storage.upload-dir=target/test-uploads",
         "app.security.demo-email=tester@example.com","app.security.demo-password=StrongTestPassword123!",
-        "app.security.demo-user-enabled=true","app.security.admin-key=test-admin-key"})
+        "app.security.demo-user-enabled=true"})
 class ApplicationSmokeTest {
     @Container
     @ServiceConnection
@@ -99,6 +99,12 @@ class ApplicationSmokeTest {
     @Test
     void manualAgentSearchRequiresAdministratorAccountAndReportsMissingTavilyConfiguration() throws Exception {
         mockMvc.perform(post("/api/admin/jobs/agent-search"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/admin/jobs/agent-search").header("X-Admin-Key", "legacy-key"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/admin/jobs/agent-search").with(user("candidate").roles("CANDIDATE")).with(csrf()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/integration/audit").with(user("candidate").roles("CANDIDATE")))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/admin/jobs/agent-search").with(user("admin").roles("ADMIN")).with(csrf()))
                 .andExpect(status().isOk())

@@ -59,7 +59,6 @@ app:
     demo-user-enabled: ${APP_DEMO_USER_ENABLED:false}
     demo-email: ${APP_DEMO_EMAIL:demo@talentshift.local}
     demo-password: ${APP_DEMO_PASSWORD:ChangeThisDemoPassword123!}
-    admin-key: ${APP_ADMIN_KEY:change-this-admin-key}
     admin-user-enabled: ${APP_ADMIN_USER_ENABLED:false}
     admin-email: ${APP_ADMIN_EMAIL:admin@talentshift.local}
     admin-password: ${APP_ADMIN_PASSWORD:}

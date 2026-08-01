@@ -943,15 +943,10 @@ class JobService {
 
 @Service
 class AdminKeyVerifier {
-    private final byte[] expected;
-    AdminKeyVerifier(@org.springframework.beans.factory.annotation.Value("${app.security.admin-key}") String key) {
-        this.expected=key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-    }
+    AdminKeyVerifier() {}
     void verify(String provided, Authentication authentication) {
         if (authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()))) return;
-        if (provided != null && !provided.isBlank() && java.security.MessageDigest.isEqual(
-                expected,provided.getBytes(java.nio.charset.StandardCharsets.UTF_8))) return;
         throw new AdminKeyException();
     }
 }

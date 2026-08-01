@@ -101,3 +101,9 @@ export async function reverseMerge(id, reason) {
   });
   if (!res.ok) throw new Error('Failed to reverse merge');
 }
+
+export async function fetchSemanticJobs(q) {
+  const res = await fetch(`/api/v1/canonical/jobs/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to perform semantic search');
+  return { content: await res.json() };
+}

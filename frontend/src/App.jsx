@@ -6,7 +6,7 @@ import {
 import { 
   fetchImports, triggerMockImport, triggerImport, fetchCanonicalJobs, 
   fetchCanonicalSources, fetchPendingReviews, approveReview, rejectReview, 
-  updateSourceType, fetchAuditLogs, fetchMergeHistory, reverseMerge,
+  updateSourceType, fetchAuditLogs, fetchMergeHistory, reverseMerge, fetchSemanticJobs,
   login, logout, isAuthenticated as checkAuth
 } from './api';
 import './index.css';
@@ -342,6 +342,7 @@ function Explorer({ type }) {
   const [loadingJobsFor, setLoadingJobsFor] = useState(null);
 
   useEffect(() => {
+    // Only load automatically if not searching by title to avoid double fetches, or handle it simply:
     loadData();
   }, [type]);
 
@@ -356,10 +357,15 @@ function Explorer({ type }) {
         if (searchDomain) params.domain = searchDomain;
         res = await fetchCanonicalSources(params);
       } else {
-        const params = {};
-        if (searchOrg) params.organization = searchOrg;
-        if (searchLocation) params.location = searchLocation;
-        res = await fetchCanonicalJobs(params);
+        if (searchTitle) {
+          // Use AI Semantic Search via Backend
+          res = await fetchSemanticJobs(searchTitle);
+        } else {
+          const params = {};
+          if (searchOrg) params.organization = searchOrg;
+          if (searchLocation) params.location = searchLocation;
+          res = await fetchCanonicalJobs(params);
+        }
       }
       setData(res.content || []);
     } catch (e) {
@@ -397,47 +403,15 @@ function Explorer({ type }) {
     }
   };
 
-  // Synonym map for smart filtering
-  const synonymMap = {
-    'software': ['engineer', 'developer', 'programmer', 'it', 'tech', 'backend', 'frontend'],
-    'engineer': ['software', 'developer', 'tech'],
-    'chef': ['restaurant', 'cook', 'culinary', 'food', 'kitchen', 'baker'],
-    'restaurant': ['chef', 'cook', 'waiter', 'food', 'hospitality', 'culinary'],
-    'sales': ['retail', 'dealer', 'marketing', 'account', 'manager'],
-    'retail': ['sales', 'dealer', 'marketing', 'cashier'],
-    'hr': ['human resources', 'payroll', 'people', 'recruiter'],
-    'admin': ['administrative', 'assistant', 'clerk', 'office']
-  };
-
-  const getSearchKeywords = (query) => {
-    if (!query) return [];
-    const q = query.toLowerCase().trim();
-    const words = [q];
-    // Check if the exact query or any word in the query has synonyms
-    for (const [key, related] of Object.entries(synonymMap)) {
-      if (q.includes(key)) {
-        words.push(...related);
-      }
-    }
-    return words;
-  };
-
-  // Client side filtering for "Offline Only" and "Smart Job Title search"
+  // Client side filtering for "Offline Only" and "Source Type"
   const filteredData = data.filter(item => {
     if (offlineOnly && item.consecutive_check_failures === 0) return false;
     
     if (type === 'sources' && searchType) {
       if ((item.source_type || 1) !== parseInt(searchType, 10)) return false;
     }
-
-    // Smart Job Title filtering
-    if (type === 'jobs' && searchTitle) {
-      const keywords = getSearchKeywords(searchTitle);
-      const title = (item.title || '').toLowerCase();
-      // If the title doesn't match any of our expanded keywords, filter it out
-      const matches = keywords.some(kw => title.includes(kw));
-      if (!matches) return false;
-    }
+    
+    // Note: Job Title search is now handled purely via Backend Semantic Search (pgvector)
     
     return true;
   });

@@ -14,8 +14,8 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/v1")
 public class ApiController {
-    private final JdbcTemplate db;private final ImportService imports;private final ReviewService reviews;private final TransferService transfers;
-    public ApiController(JdbcTemplate db,ImportService imports,ReviewService reviews,TransferService transfers){this.db=db;this.imports=imports;this.reviews=reviews;this.transfers=transfers;}
+    private final JdbcTemplate db;private final ImportService imports;private final ReviewService reviews;private final TransferService transfers;private final com.talentshift.hub.integration.search.SemanticSearchService semanticSearch;
+    public ApiController(JdbcTemplate db,ImportService imports,ReviewService reviews,TransferService transfers,com.talentshift.hub.integration.search.SemanticSearchService semanticSearch){this.db=db;this.imports=imports;this.reviews=reviews;this.transfers=transfers;this.semanticSearch=semanticSearch;}
 
     @PostMapping("/imports/mock") @Operation(summary="Import all mock sources and jobs")
     public Map<String,Object> importMock(){UUID id=imports.start("mock-system");return Map.of("batchId",id,"systemKey","mock-system");}
@@ -25,6 +25,7 @@ public class ApiController {
     @GetMapping("/raw/jobs") public List<Map<String,Object>> rawJobs(@RequestParam(defaultValue="20000") @Max(20000) int limit){return rows("select id,import_batch_id,connected_system_id,external_record_id,payload,checksum,processing_status,received_at from raw_job order by received_at desc limit ?",limit);}
     @GetMapping("/canonical/sources") public List<Map<String,Object>> sources(@RequestParam(defaultValue="20000") @Max(20000) int limit){return rows("select * from canonical_source order by created_at desc limit ?",limit);}
     @GetMapping("/canonical/jobs") public List<Map<String,Object>> jobs(@RequestParam(defaultValue="20000") @Max(20000) int limit){return rows("select * from canonical_job order by created_at desc limit ?",limit);}
+    @GetMapping("/canonical/jobs/search") public List<Map<String,Object>> searchJobs(@RequestParam String q, @RequestParam(defaultValue="100") @Max(500) int limit){return semanticSearch.search(q, limit);}
     @GetMapping("/deduplication/decisions") public List<Map<String,Object>> decisions(@RequestParam(defaultValue="100") @Max(500) int limit){
         return rows("""
             select 'SOURCE' entity_type,raw_source_id raw_record_id,canonical_source_id canonical_id,duplicate_reason reason,confidence,created_at from source_observation

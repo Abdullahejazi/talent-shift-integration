@@ -2,9 +2,9 @@ spring:
   application:
     name: talentshift-core
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/talentshift}
-    username: ${SPRING_DATASOURCE_USERNAME:talentshift}
-    password: ${SPRING_DATASOURCE_PASSWORD:talentshift-local-password}
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5435}/${PGDATABASE:talentshift}
+    username: ${PGUSER:${SPRING_DATASOURCE_USERNAME:talentshift}}
+    password: ${PGPASSWORD:${SPRING_DATASOURCE_PASSWORD:talentshift-local-password}}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2

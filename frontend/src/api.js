@@ -76,6 +76,9 @@ export const collectJobs = () => request('/api/admin/jobs/collect',{method:'POST
 export const searchNewJobs = () => request('/api/admin/jobs/agent-search',{method:'POST'});
 export const searchSeedJobs = () => request('/api/admin/jobs/agent-seed-search',{method:'POST'});
 export const recheckSources = () => request('/api/admin/job-sources/recheck',{method:'POST'});
+export const verifyJobLinks = () => request('/api/admin/job-sources/verify-jobs',{method:'POST'});
+export const expireJobs = () => request('/api/admin/job-sources/expire-jobs',{method:'POST'});
+export const deduplicateJobs = () => request('/api/admin/job-sources/deduplicate-jobs',{method:'POST'});
 export const discoverCareers = () => request('/api/admin/job-sources/discover-careers',{method:'POST'});
 export const toggleSource = (id,enabled) => request(`/api/admin/job-sources/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});
 

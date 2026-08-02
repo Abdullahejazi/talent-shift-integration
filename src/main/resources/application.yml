@@ -65,7 +65,7 @@ app:
     session-hours: ${APP_SESSION_HOURS:24}
   jobs:
     seed-candidate-csv: ${SEED_CANDIDATE_CSV:}
-    collection-on-startup: ${JOB_COLLECTION_ON_STARTUP:true}
+    collection-on-startup: ${JOB_COLLECTION_ON_STARTUP:false}
     continuous-poll-ms: ${JOB_CONTINUOUS_POLL_MS:60000}
     continuous-initial-delay-ms: ${JOB_CONTINUOUS_INITIAL_DELAY_MS:60000}
     arbeitnow-refresh-minutes: ${ARBEITNOW_REFRESH_MINUTES:15}
@@ -97,9 +97,9 @@ app:
     tavily-maximum-jobs: ${TAVILY_MAXIMUM_JOBS:2500}
     tavily-new-job-search-credits: ${TAVILY_NEW_JOB_SEARCH_CREDITS:200}
     tavily-seed-search-credits: ${TAVILY_SEED_SEARCH_CREDITS:200}
-    registry-concurrency: ${JOB_REGISTRY_CONCURRENCY:24}
-    registry-per-domain-concurrency: ${JOB_REGISTRY_PER_DOMAIN_CONCURRENCY:2}
-    registry-batch-limit: ${JOB_REGISTRY_BATCH_LIMIT:2500}
+    registry-concurrency: ${JOB_REGISTRY_CONCURRENCY:4}
+    registry-per-domain-concurrency: ${JOB_REGISTRY_PER_DOMAIN_CONCURRENCY:1}
+    registry-batch-limit: ${JOB_REGISTRY_BATCH_LIMIT:100}
     maximum-job-sources: ${JOB_MAXIMUM_SOURCES:10000}
     source-health-refresh-ms: ${JOB_SOURCE_HEALTH_REFRESH_MS:5400000}
     source-health-initial-delay-ms: ${JOB_SOURCE_HEALTH_INITIAL_DELAY_MS:900000}

@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+buildCommand = "mvn clean package -DskipTests"
+
+[deploy]
+startCommand = "java -jar target/*.jar"
+
+[env]
+SERVER_PORT = "${PORT}"
+SPRING_DATASOURCE_URL = "jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}"
+SPRING_DATASOURCE_USERNAME = "${PGUSER}"
+SPRING_DATASOURCE_PASSWORD = "${PGPASSWORD}"

@@ -28,7 +28,9 @@ spring:
       static-locations: ${TALENTSHIFT_STATIC_LOCATIONS:file:./frontend/dist/,classpath:/static/}
 
 server:
-  port: ${SERVER_PORT:8081}
+  # Railway and most container platforms inject PORT. SERVER_PORT remains
+  # available for local/IntelliJ overrides.
+  port: ${PORT:${SERVER_PORT:8081}}
   forward-headers-strategy: framework
   error:
     include-message: never

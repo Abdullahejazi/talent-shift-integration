@@ -2,7 +2,7 @@ spring:
   application:
     name: talentshift-core
   datasource:
-    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5435}/${PGDATABASE:talentshift}
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5434}/${PGDATABASE:talentshift}
     username: ${PGUSER:${SPRING_DATASOURCE_USERNAME:talentshift}}
     password: ${PGPASSWORD:${SPRING_DATASOURCE_PASSWORD:talentshift-local-password}}
     hikari:
@@ -60,9 +60,9 @@ app:
     demo-user-enabled: ${APP_DEMO_USER_ENABLED:false}
     demo-email: ${APP_DEMO_EMAIL:demo@talentshift.local}
     demo-password: ${APP_DEMO_PASSWORD:ChangeThisDemoPassword123!}
-    admin-user-enabled: ${APP_ADMIN_USER_ENABLED:false}
+    admin-user-enabled: ${APP_ADMIN_USER_ENABLED:true}
     admin-email: ${APP_ADMIN_EMAIL:admin@talentshift.local}
-    admin-password: ${APP_ADMIN_PASSWORD:}
+    admin-password: ${APP_ADMIN_PASSWORD:AdminPassword123!}
     session-hours: ${APP_SESSION_HOURS:24}
   jobs:
     seed-candidate-csv: ${SEED_CANDIDATE_CSV:}

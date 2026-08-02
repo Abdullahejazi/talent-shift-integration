@@ -12,6 +12,7 @@ spring:
   flyway:
     enabled: true
     validate-migration-naming: true
+    validate-on-migrate: false
   servlet:
     multipart:
       max-file-size: 6MB

@@ -144,39 +144,36 @@ class JobEnrichmentService {
         List<Pending> jobs=jdbc.sql("""
                 UPDATE jobs SET enrichment_status='PROCESSING',enrichment_attempts=enrichment_attempts+1
                 WHERE id IN (SELECT id FROM jobs WHERE enrichment_status='PENDING' ORDER BY collected_at LIMIT :limit FOR UPDATE SKIP LOCKED)
-                RETURNING id,title,description
-                """).param("limit",batchSize).query((rs,n)->new Pending(rs.getObject("id",UUID.class),rs.getString("title"),rs.getString("description"))).list();
+                RETURNING id,title,description,apply_url
+                """).param("limit",batchSize).query((rs,n)->new Pending(rs.getObject("id",UUID.class),rs.getString("title"),rs.getString("description"),rs.getString("apply_url"))).list();
         for(Pending job:jobs)try{
-            String category=category(job.title());String level=level(job.title());String summary=summarize(job.description());
+            String currentDesc = job.description();
+            if (currentDesc == null && job.applyUrl() != null && job.applyUrl().startsWith("http")) {
+                try { currentDesc = org.jsoup.Jsoup.connect(job.applyUrl()).userAgent("Mozilla/5.0").timeout(5000).get().body().text(); } catch(Exception ignored) {}
+            }
+            String category=category(job.title());String level=level(job.title());String summary=summarize(currentDesc);
             jdbc.sql("""
                     UPDATE jobs SET normalized_category=:category,experience_level=:level,summary_en=:summary,
+                      description=COALESCE(description, :newDesc),
                       enrichment_status='COMPLETE' WHERE id=:id
-                    """).param("category",category).param("level",level).param("summary",summary).param("id",job.id()).update();
+                    """).param("category",category).param("level",level).param("summary",summary).param("newDesc",currentDesc).param("id",job.id()).update();
         }catch(RuntimeException e){jdbc.sql("UPDATE jobs SET enrichment_status=CASE WHEN enrichment_attempts>=3 THEN 'FAILED' ELSE 'PENDING' END WHERE id=:id").param("id",job.id()).update();}
     }
     private static String category(String title){String t=title.toLowerCase(Locale.ROOT);if(t.matches(".*(software|developer|engineer|data|cloud|security|it).*"))return "Technology";if(t.matches(".*(finance|account|audit|bank).*"))return "Finance";if(t.matches(".*(sales|marketing|business development).*"))return "Sales & Marketing";if(t.matches(".*(health|nurse|doctor|medical).*"))return "Healthcare";return "Other";}
     private static String level(String title){String t=title.toLowerCase(Locale.ROOT);if(t.matches(".*(intern|trainee|graduate).*"))return "Entry";if(t.matches(".*(senior|lead|principal|manager|director|head|chief).*"))return "Senior";return "Mid-level";}
     private static String summarize(String value){if(value==null||value.isBlank())return null;String clean=value.replaceAll("\\s+"," ").trim();return clean.length()<=500?clean:clean.substring(0,497)+"...";}
-    private record Pending(UUID id,String title,String description){}
+    private record Pending(UUID id,String title,String description,String applyUrl){}
 }
 
 @RestController
 @RequestMapping("/api/admin/job-sources")
 class JobSourceOperationsController {
     private final JdbcClient jdbc; private final AdminKeyVerifier admin; private final JobSourceRegistry registry;
-    private final JobCollectorService collector; private final OfficialCareersDiscoveryService careersDiscovery; private final int aiCredits; private final int seedRefreshMinutes;
+    private final JobCollectorService collector; private final int aiCredits; private final int seedRefreshMinutes;
     JobSourceOperationsController(JdbcClient jdbc,AdminKeyVerifier admin,JobSourceRegistry registry,JobCollectorService collector,
-            OfficialCareersDiscoveryService careersDiscovery,
+
             @Value("${app.jobs.tavily-new-job-search-credits:200}")int aiCredits,
-            @Value("${app.jobs.seed-refresh-minutes:60}")int seedRefreshMinutes){this.jdbc=jdbc;this.admin=admin;this.registry=registry;this.collector=collector;this.careersDiscovery=careersDiscovery;this.aiCredits=Math.max(1,Math.min(aiCredits,10_000));this.seedRefreshMinutes=Math.max(5,seedRefreshMinutes);}
-    @GetMapping
-    List<SourceHealth> sources(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
-            SELECT s.id,s.company_name,s.source_type,s.careers_url,s.enabled,s.permission_status,
-              s.last_success_at,s.last_failure_at,s.next_retry_at,s.consecutive_failures,s.last_error_code,
-              count(f.id) fetches,coalesce(sum(f.result_count),0) jobs_found,s.refresh_interval_minutes
-            FROM job_sources s LEFT JOIN job_source_fetches f ON f.source_id=s.id
-            GROUP BY s.id ORDER BY s.enabled DESC,s.company_name
-            """).query((rs,n)->new SourceHealth(rs.getObject("id",UUID.class),rs.getString("company_name"),rs.getString("source_type"),rs.getString("careers_url"),rs.getBoolean("enabled"),rs.getString("permission_status"),rs.getObject("last_success_at",OffsetDateTime.class),rs.getObject("last_failure_at",OffsetDateTime.class),rs.getObject("next_retry_at",OffsetDateTime.class),rs.getInt("consecutive_failures"),rs.getString("last_error_code"),rs.getLong("fetches"),rs.getLong("jobs_found"),rs.getInt("refresh_interval_minutes"))).list();}
+            @Value("${app.jobs.seed-refresh-minutes:60}")int seedRefreshMinutes){this.jdbc=jdbc;this.admin=admin;this.registry=registry;this.collector=collector;this.aiCredits=Math.max(1,Math.min(aiCredits,10_000));this.seedRefreshMinutes=Math.max(5,seedRefreshMinutes);}
 
     @GetMapping("/status")
     OperationsStatus status(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
@@ -193,14 +190,8 @@ class JobSourceOperationsController {
     @PostMapping("/recheck")
     CollectionRequest recheck(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);registry.forceAllDue();return collector.requestManualCollection();}
 
-    @PostMapping("/discover-careers")
-    CareersDiscoveryResult discoverCareers(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return careersDiscovery.discoverNextBatch();}
 
-    @PatchMapping("/{id}")
-    SourceHealth toggle(@RequestHeader(name="X-Admin-Key",required=false)String key,@PathVariable UUID id,@RequestBody SourceToggle request,Authentication authentication){admin.verify(key,authentication);jdbc.sql("UPDATE job_sources SET enabled=:enabled,next_retry_at=CASE WHEN :enabled THEN now() ELSE next_retry_at END,updated_at=now() WHERE id=:id").param("enabled",request.enabled()).param("id",id).update();return sources(key,authentication).stream().filter(source->source.id().equals(id)).findFirst().orElseThrow(JobNotFoundException::new);}
 
-    @GetMapping("/discovery-history")
-    List<DiscoveryHistory> history(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("SELECT query_text,search_kind,searched_at,result_count,jobs_accepted,seeds_promoted FROM ai_discovery_searches ORDER BY searched_at DESC LIMIT 100").query((rs,n)->new DiscoveryHistory(rs.getString(1),rs.getString(2),rs.getObject(3,OffsetDateTime.class),rs.getInt(4),rs.getInt(5),rs.getInt(6))).list();}
 
     @GetMapping("/daily-metrics")
     List<DailyJobOperations> dailyMetrics(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
@@ -208,4 +199,11 @@ class JobSourceOperationsController {
             FROM daily_job_operations ORDER BY day DESC LIMIT 31
             """).query((rs,n)->new DailyJobOperations(rs.getObject(1,java.time.LocalDate.class),rs.getLong(2),
             rs.getLong(3),rs.getLong(4),rs.getLong(5),rs.getLong(6),rs.getLong(7))).list();}
+
+    @GetMapping("/performance")
+    List<SourcePerformance> performance(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
+            SELECT company, count(*) as jobs FROM jobs GROUP BY company ORDER BY jobs DESC, company ASC
+            """).query((rs,n)->new SourcePerformance(rs.getString(1),rs.getLong(2))).list();}
 }
+
+record SourcePerformance(String company, long jobs) {}

@@ -478,3 +478,6 @@ tr:hover td {
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
 
+
+.pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1.5rem 0; color: var(--text-secondary); }
+

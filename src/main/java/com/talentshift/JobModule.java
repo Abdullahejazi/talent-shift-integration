@@ -628,7 +628,7 @@ class JobRepository {
         int safeSize = Math.max(1, Math.min(size, 100));
         int safePage = Math.max(0, page);
         String where = """
-                FROM jobs WHERE status='ACTIVE' AND saudi_relevant=true
+                FROM jobs WHERE status='ACTIVE'
                   AND (:keyword='' OR title ILIKE :keywordLike OR company ILIKE :keywordLike OR COALESCE(description,'') ILIKE :keywordLike)
                   AND (:location='' OR COALESCE(location,'') ILIKE :locationLike)
                   AND (:type='' OR COALESCE(employment_type,'') ILIKE :typeLike)
@@ -961,15 +961,13 @@ class JobController {
     private final ProfileRepository profiles;
     private final AdminKeyVerifier adminKeyVerifier;
     private final AgentJobIngestionService agentIngestion;
-    private final TavilyJobDiscoveryService tavilyDiscovery;
 
     JobController(JobRepository jobs, JobCollectorService collector, JobService jobService,
             ProfileRepository profiles, AdminKeyVerifier adminKeyVerifier,
-            AgentJobIngestionService agentIngestion, TavilyJobDiscoveryService tavilyDiscovery) {
+            AgentJobIngestionService agentIngestion) {
         this.jobs = jobs; this.collector = collector; this.jobService = jobService;
         this.profiles = profiles; this.adminKeyVerifier = adminKeyVerifier;
         this.agentIngestion = agentIngestion;
-        this.tavilyDiscovery = tavilyDiscovery;
     }
 
     @GetMapping("/jobs")
@@ -1009,19 +1007,6 @@ class JobController {
         return agentIngestion.ingest(request.jobs());
     }
 
-    @PostMapping("/admin/jobs/agent-search")
-    AgentSearchSummary agentSearch(@RequestHeader(name="X-Admin-Key", required=false) String adminKey,
-            Authentication authentication) {
-        adminKeyVerifier.verify(adminKey, authentication);
-        return tavilyDiscovery.searchNow();
-    }
-
-    @PostMapping("/admin/jobs/agent-seed-search")
-    AgentSearchSummary agentSourceSearch(@RequestHeader(name="X-Admin-Key", required=false) String adminKey,
-            Authentication authentication) {
-        adminKeyVerifier.verify(adminKey, authentication);
-        return tavilyDiscovery.searchSeedJobsNow();
-    }
 }
 
 class JobNotFoundException extends RuntimeException {}

@@ -16,10 +16,10 @@ const candidateNav=[
   ['messages','Messages',MessageSquare],['profile','Profile & CV',CircleUserRound],['analytics','Analytics',Activity],['preferences','Preferences',Settings]
 ];
 const adminNav=[
-  ['operations','Collection control',Workflow],['sources','Source health',Database],['discovery','Discovery queries',Search],
-  ['raw','Raw records',Archive],['lineage','Job lineage',Network],['reviews','Review queue',ShieldCheck],
-  ['systems','Connected systems',Building2],['imports','Import batches',FileClock],['checkpoints','Checkpoints',RefreshCw],
-  ['outbox','Delivery outbox',Send],['merges','Merge history',GitMerge],['audit','Audit trail',Inbox],['ai','Future AI',Sparkles]
+  ['operations','Collection control',Workflow],
+  ['categories','Source Categories',Database],
+  ['approvals','AI Source Approvals',ListChecks],
+  ['jobs','Find jobs (Preview)',BriefcaseBusiness]
 ];
 
 function Aurora(){return <div className="aurora-container"><div className="aurora-blob aurora-one"/><div className="aurora-blob aurora-two"/><div className="aurora-blob aurora-three"/></div>}
@@ -60,7 +60,7 @@ function Login({onLogin,theme,setTheme}){const[mode,setMode]=useState('login');c
 
 function Page({id,user}){switch(id){
   case'dashboard':return <Dashboard user={user}/>;case'jobs':return <Jobs/>;case'companies':return <Companies/>;case'saved':return <SimpleData title="Saved jobs" subtitle="Roles you want to revisit." loader={api.fetchSavedJobs}/>;case'applications':return <Applications/>;case'meetings':return <SimpleData title="Meetings" subtitle="Your upcoming career conversations." loader={api.fetchMeetings}/>;case'messages':return <SimpleData title="Messages" subtitle="Employer and TalentShift conversations." loader={api.fetchConversations}/>;case'profile':return <Profile/>;case'analytics':return <SimpleData title="Career analytics" subtitle="A measured view of your search activity." loader={api.fetchAnalytics}/>;case'preferences':return <Preferences/>;
-  case'operations':return <Operations/>;case'sources':return <Sources/>;case'discovery':return <SimpleData title="Discovery queries" subtitle="Only queries that reached the collection filter." loader={api.fetchDiscoveryHistory}/>;case'raw':return <SimpleData title="Immutable raw records" subtitle="Original payloads and checksums before canonical processing." loader={api.fetchRawJobs}/>;case'lineage':return <SimpleData title="Job lineage" subtitle="Every observation linking a canonical role to its origin." loader={api.fetchLineage}/>;case'reviews':return <Reviews/>;case'systems':return <SimpleData title="Connected systems" subtitle="Collection and delivery boundaries managed independently." loader={api.fetchSystems}/>;case'imports':return <SimpleData title="Import batches" subtitle="Restartable batch progress and rejection totals." loader={api.fetchImports}/>;case'checkpoints':return <SimpleData title="Sync checkpoints" subtitle="Cursor state and the last successful synchronization." loader={api.fetchCheckpoints}/>;case'outbox':return <Outbox/>;case'merges':return <SimpleData title="Merge history" subtitle="An audit-friendly record of deduplication decisions." loader={api.fetchMerges}/>;case'audit':return <SimpleData title="Audit trail" subtitle="Administrative and integration actions." loader={api.fetchAudit}/>;case'ai':return <FutureAi/>;default:return <Dashboard user={user}/>}}
+  case'operations':return <Operations/>;case'categories':return <SourceCategories/>;case'approvals':return <AiSourceApprovals/>;default:return <Dashboard user={user}/>}}
 
 function PageHead({title,subtitle,actions}){return <div className="page-head"><div><h1>{title}</h1><p>{subtitle}</p></div>{actions&&<div className="page-actions">{actions}</div>}</div>}
 function Stat({label,value,detail,icon:Icon=Activity}){return <div className="metric"><span className="metric-icon"><Icon/></span><div><small>{label}</small><strong>{value??'—'}</strong><span>{detail}</span></div></div>}
@@ -68,24 +68,134 @@ function State({loading,error,children}){if(loading)return <div className="state
 
 function Dashboard({user}){const ops=useLoad(()=>user.role==='ADMIN'?api.fetchOperations():api.fetchAnalytics(),[user.role]);const jobs=useLoad(()=>api.fetchJobs({limit:6}),[]);const data=ops.data||{};return <><PageHead title={`Good day, ${user.displayName?.split(' ')[0]||'there'}.`} subtitle="Here is the clearest view of your TalentShift workspace."/><div className="metrics-grid"><Stat label="Active jobs" value={data.activeJobs??jobs.data?.length} detail="Verified collection" icon={BriefcaseBusiness}/><Stat label="Sources" value={data.totalSources??'Live'} detail="Public source network" icon={Database}/><Stat label="Applications" value={data.applications??'—'} detail="Candidate workspace" icon={ListChecks}/><Stat label="Source health" value={data.healthySources??'Monitored'} detail="Automated checks" icon={ShieldCheck}/></div><section className="panel"><div className="section-title"><div><h2>Recently collected jobs</h2><p>Fresh roles with application routes.</p></div><button className="text-button" onClick={()=>location.hash='jobs'}>View all <ChevronRight/></button></div><State {...jobs}><JobRows jobs={array(jobs.data).slice(0,6)}/></State></section></>}
 
-function Jobs(){const[q,setQ]=useState('');const[locationValue,setLocation]=useState('');const params=useMemo(()=>({keyword:q,location:locationValue,limit:100}),[q,locationValue]);const result=useLoad(()=>api.fetchJobs(params),[q,locationValue]);return <><PageHead title="Find your next role" subtitle="Verified jobs with clear source information and direct application routes."/><div className="search-rail"><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search roles or skills"/><input value={locationValue} onChange={e=>setLocation(e.target.value)} placeholder="Location"/></div><section className="panel"><State {...result}><JobRows jobs={array(result.data)}/></State></section></>}
-function JobRows({jobs}){if(!jobs.length)return <Empty text="No jobs matched this view."/>;return <div className="job-list">{jobs.map(job=><article className="job-row" key={job.id}><div className="company-tile">{(job.company||job.organization_name||'T')[0]}</div><div className="job-main"><h3>{job.title}</h3><p>{job.company||job.organization_name} · {job.location||'Location flexible'}</p><div className="chips"><span>{job.employmentType||job.employment_type||'Open role'}</span>{job.remote&&<span>Remote</span>}<span>{job.source||'Verified source'}</span></div></div><div className="job-actions"><button className="icon-button" onClick={()=>api.saveJob(job.id)} title="Save job"><Heart/></button><a className="btn btn-primary" href={job.applyUrl||job.apply_url||job.canonical_application_url} target="_blank" rel="noreferrer">Apply directly</a></div></article>)}</div>}
+function Jobs(){const[q,setQ]=useState('');const[locationValue,setLocation]=useState('');const[page,setPage]=useState(0);const params=useMemo(()=>({keyword:q,location:locationValue,remote:false,page,size:100}),[q,locationValue,page]);const result=useLoad(()=>api.fetchJobs(params),[q,locationValue,page]);const[counts,setCounts]=useState({onsite:0});useEffect(()=>{Promise.all([api.fetchJobs({remote:false,size:1})]).then(([on])=>setCounts({onsite:on.total})).catch(()=>{});},[]);useEffect(()=>setPage(0),[q,locationValue]);const totalPages=result.data?.total?Math.ceil(result.data.total/100):0;return <><PageHead title="Find your next role" subtitle="Verified jobs with clear source information and direct application routes."/><div style={{display:'flex',gap:'1rem',marginBottom:'1.5rem'}}><button className="btn btn-primary">On-site (Saudi Arabia) ({counts.onsite})</button></div><div className="search-rail"><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search roles or skills"/><input value={locationValue} onChange={e=>setLocation(e.target.value)} placeholder="Location"/></div><section className="panel"><State {...result}><JobRows jobs={array(result.data)}/>{totalPages>1&&<div className="pagination"><button className="btn" disabled={page===0} onClick={()=>setPage(p=>p-1)}>Previous</button><span>Page {page+1} of {totalPages}</span><button className="btn" disabled={page>=totalPages-1} onClick={()=>setPage(p=>p+1)}>Next</button></div>}</State></section></>}
+function JobRows({jobs}){if(!jobs.length)return <Empty text="No jobs matched this view."/>;return <div className="job-list">{jobs.map(job=><article className="job-row" key={job.id}><div className="company-tile">{(job.company||job.organization_name||'T')[0]}</div><div className="job-main"><h3>{job.title}</h3><p>{job.company||job.organization_name} · {job.location||'Location flexible'}</p><div className="chips"><span>{job.employmentType||job.employment_type||'Open role'}</span><span>{job.source||'Verified source'}</span></div></div><div className="job-actions"><button className="icon-button" onClick={()=>api.saveJob(job.id)} title="Save job"><Heart/></button><a className="btn btn-primary" href={job.applyUrl||job.apply_url||job.canonical_application_url} target="_blank" rel="noreferrer">Apply directly</a></div></article>)}</div>}
 
 function Companies(){const[q,setQ]=useState('');const result=useLoad(()=>api.fetchCompanies(q),[q]);return <><PageHead title="Companies" subtitle="Explore employers represented in the verified job index."/><div className="search-rail"><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search companies"/></div><State {...result}><div className="company-grid">{array(result.data?.content??result.data).map(c=><article className="company-card" key={c.id||c.slug}><div className="company-tile large">{(c.name||'C')[0]}</div><h3>{c.name}</h3><p>{c.industry||c.location||'Employer'}</p><strong>{c.activeJobs??c.jobCount??0} active roles</strong></article>)}</div></State></>}
 function Applications(){const result=useLoad(api.fetchApplications,[]);return <><PageHead title="Application tracker" subtitle="Keep every opportunity and next step visible."/><State {...result}><div className="kanban">{['SAVED','APPLIED','INTERVIEW','OFFER'].map(status=><section className="kanban-column" key={status}><h3>{status}</h3>{array(result.data).filter(x=>(x.status||'APPLIED')===status).map(x=><article className="mini-card" key={x.id}><strong>{x.jobTitle||x.title||'Application'}</strong><span>{x.company||''}</span><select value={x.status} onChange={e=>api.updateApplication(x.id,e.target.value).then(result.reload)}>{['APPLIED','SCREENING','INTERVIEW','OFFER','REJECTED'].map(v=><option key={v}>{v}</option>)}</select></article>)}</section>)}</div></State></>}
 function Profile(){const result=useLoad(api.fetchProfile,[]);const[form,setForm]=useState({});useEffect(()=>{if(result.data)setForm(result.data)},[result.data]);return <><PageHead title="Profile & CV" subtitle="Keep your professional information ready for matching."/><State {...result}><form className="form-panel" onSubmit={async e=>{e.preventDefault();await api.updateProfile(form);result.reload()}}><label>Full name<input value={form.fullName||''} onChange={e=>setForm({...form,fullName:e.target.value})}/></label><label>Headline<input value={form.headline||''} onChange={e=>setForm({...form,headline:e.target.value})}/></label><label>Location<input value={form.location||''} onChange={e=>setForm({...form,location:e.target.value})}/></label><label className="wide">Professional summary<textarea rows="6" value={form.summary||''} onChange={e=>setForm({...form,summary:e.target.value})}/></label><button className="btn btn-primary">Save profile</button></form></State></>}
 function Preferences(){const result=useLoad(api.fetchPreferences,[]);const[form,setForm]=useState({});useEffect(()=>{if(result.data)setForm(result.data)},[result.data]);return <><PageHead title="Preferences" subtitle="Control job alerts, language, and workplace choices."/><State {...result}><form className="form-panel" onSubmit={async e=>{e.preventDefault();await api.updatePreferences(form);result.reload()}}>{Object.entries(form).map(([key,value])=><label key={key}>{labelize(key)}<input value={typeof value==='object'?JSON.stringify(value):value??''} onChange={e=>setForm({...form,[key]:e.target.value})}/></label>)}<button className="btn btn-primary">Save preferences</button></form></State></>}
 
-function Operations(){const status=useLoad(api.fetchOperations,[]);const metrics=useLoad(api.fetchDailyMetrics,[]);const[action,setAction]=useState('');const[operationError,setOperationError]=useState('');const run=async(fn,label)=>{setAction(label);setOperationError('');try{await fn();await status.reload()}catch(error){setOperationError(error.message)}finally{setAction('')}};const d=status.data||{};return <><PageHead title="Collection control center" subtitle="Private administrator controls for collection, verification, discovery, and database maintenance." actions={<><button className="btn" onClick={()=>run(api.searchSeedJobs,'Searching registered seeds')}><Search/> Search seed jobs</button><button className="btn" onClick={()=>run(api.searchNewJobs,'Searching beyond registered sources')}><Sparkles/> Find new jobs</button><button className="btn" onClick={()=>run(api.discoverCareers,'Discovering official careers pages')}>Discover careers</button><button className="btn" onClick={()=>run(api.recheckSources,'Rechecking sources')}><RefreshCw/> Recheck sources</button><button className="btn" onClick={()=>run(api.verifyJobLinks,'Verifying job links')}><ShieldCheck/> Verify jobs</button><button className="btn" onClick={()=>run(api.expireJobs,'Expiring old jobs')}><FileClock/> Expire jobs</button><button className="btn" onClick={()=>run(api.deduplicateJobs,'Removing duplicates')}><GitMerge/> Deduplicate</button><button className="btn btn-primary" onClick={()=>run(api.collectJobs,'Collecting')}><Play/> Run collection</button></>}/>{action&&<div className="notice">{action}… automatic schedules remain active.</div>}{operationError&&<div className="error-banner" role="alert">{operationError}</div>}<State {...status}><div className="metrics-grid"><Stat label="Active jobs" value={d.activeJobs} detail="Visible to candidates"/><Stat label="Pending verification" value={d.pendingJobs} detail="Collected, awaiting link check"/><Stat label="Expired jobs" value={d.expiredJobs} detail="Hidden from search"/><Stat label="Total stored jobs" value={d.totalJobs} detail={`${d.outOfScopeJobs??0} outside policy`}/><Stat label="Total sources" value={d.totalSources}/><Stat label="Healthy sources" value={d.healthySources}/><Stat label="Enabled sources" value={d.enabledSources}/><Stat label="Last collection" value={date(d.lastCollection)}/></div></State><section className="panel"><div className="section-title"><div><h2>Daily movement</h2><p>Insertions, verification, expiry, and net active job movement.</p></div></div><State {...metrics}><DataTable data={array(metrics.data)}/></State></section></>}
-function Sources(){const result=useLoad(api.fetchSources,[]);return <><PageHead title="Source health" subtitle="Public careers pages, ATS boards, and imported source provenance." actions={<button className="btn btn-primary" onClick={result.reload}><RefreshCw/>Refresh</button>}/><State {...result}><div className="source-list">{array(result.data).map(s=><article className="source-row" key={s.id}><span className={`health ${s.enabled&&s.failures===0?'good':'warn'}`}/><div><h3>{s.company}</h3><a href={s.url} target="_blank" rel="noreferrer">{s.url}</a><small>{s.businessCategory||s.importOrigin||'Native TalentShift source'}</small></div><span className="source-type">{s.type}</span><div className="source-stats"><strong>{s.jobsFound}</strong><small>jobs found</small></div><button className={`toggle ${s.enabled?'on':''}`} onClick={()=>api.toggleSource(s.id,!s.enabled).then(result.reload)}><span/></button></article>)}</div></State></>}
-function Reviews(){const result=useLoad(()=>api.fetchReviews('PENDING'),[]);return <><PageHead title="Review queue" subtitle="Resolve uncertain deduplication decisions before they affect canonical jobs."/><State {...result}><div className="review-grid">{array(result.data).map(r=><article className="card" key={r.id}><h3>Potential duplicate</h3><p>{r.reason||'Manual confirmation required.'}</p><div className="confidence">Confidence <strong>{r.confidence??'—'}</strong></div><div className="button-row"><button className="btn btn-success" onClick={()=>api.decideReview(r.id,'approve').then(result.reload)}><CheckCircle2/>Approve</button><button className="btn btn-danger" onClick={()=>api.decideReview(r.id,'reject').then(result.reload)}><XCircle/>Reject</button></div></article>)}</div>{!array(result.data).length&&<Empty text="No pending reviews."/>}</State></>}
-function Outbox(){const result=useLoad(api.fetchOutbox,[]);return <><PageHead title="Delivery outbox" subtitle="Idempotent delivery with visible retries and attempt history." actions={<button className="btn btn-primary" onClick={()=>api.sendReady().then(result.reload)}><Send/>Send ready</button>}/><State {...result}><DataTable data={array(result.data)} actions={row=>row.status!=='SENT'&&<button className="text-button" onClick={()=>api.retryOutbox(row.id).then(result.reload)}>Retry</button>}/></State></>}
-function FutureAi(){const result=useLoad(api.fetchAiStatus,[]);return <><PageHead title="Future AI extension" subtitle="A provider-neutral connection point, disabled until you deliberately add an approved provider."/><State {...result}>{result.data&&<div className="ai-layout"><section className="panel ai-hero"><Sparkles/><div><h2>{result.data.configured?'AI provider ready':'No AI provider connected'}</h2><p>The keyless backend continues collecting without AI. Adding AI later requires one provider implementation, not controller or UI rewrites.</p></div></section><div className="metrics-grid"><Stat label="Provider" value={result.data.provider}/><Stat label="Global concurrency" value={result.data.globalConcurrency}/><Stat label="Per-domain" value={result.data.perDomainConcurrency}/><Stat label="Batch limit" value={result.data.batchLimit}/></div><button className="btn btn-primary" disabled={!result.data.enabled||!result.data.configured} onClick={()=>api.runAiDiscovery('NEW_JOBS')}>Run AI discovery</button></div>}</State></>}
+function Operations(){const status=useLoad(api.fetchOperations,[]);const metrics=useLoad(api.fetchDailyMetrics,[]);const performance=useLoad(api.fetchSourcePerformance,[]);const[action,setAction]=useState('');const[operationError,setOperationError]=useState('');const run=async(fn,label)=>{setAction(label);setOperationError('');try{await fn();await status.reload()}catch(error){setOperationError(error.message)}finally{setAction('')}};const d=status.data||{};
+return <><PageHead title="Collection control center" subtitle="Private administrator controls for collection, verification, discovery, and database maintenance." actions={<><button className="btn" onClick={()=>run(api.searchSeedJobs,'Searching registered seeds')}><Search/> Search seed jobs</button><button className="btn" onClick={()=>run(api.searchNewJobs,'Searching beyond registered sources')}><Sparkles/> Find new jobs</button><button className="btn" onClick={()=>run(api.discoverCareers,'Discovering official careers pages')}>Discover careers</button><button className="btn" onClick={()=>run(api.recheckSources,'Rechecking sources')}><RefreshCw/> Recheck sources</button><button className="btn" onClick={()=>run(api.verifyJobLinks,'Verifying job links')}><ShieldCheck/> Verify jobs</button><button className="btn" onClick={()=>run(api.expireJobs,'Expiring old jobs')}><FileClock/> Expire jobs</button><button className="btn" onClick={()=>run(api.deduplicateJobs,'Removing duplicates')}><GitMerge/> Deduplicate</button><button className="btn btn-primary" onClick={()=>run(api.collectJobs,'Collecting')}><Play/> Run collection</button></>}/>{action&&<div className="notice">{action}… automatic schedules remain active.</div>}{operationError&&<div className="error-banner" role="alert">{operationError}</div>}<State {...status}><div className="metrics-grid"><Stat label="Active jobs" value={d.activeJobs} detail="Visible to candidates"/><Stat label="Pending verification" value={d.pendingJobs} detail="Collected, awaiting link check"/><Stat label="Expired jobs" value={d.expiredJobs} detail="Hidden from search"/><Stat label="Total stored jobs" value={d.totalJobs} detail={`${d.outOfScopeJobs??0} outside policy`}/><Stat label="Total sources" value={d.totalSources}/><Stat label="Healthy sources" value={d.healthySources}/><Stat label="Enabled sources" value={d.enabledSources}/><Stat label="Last collection" value={date(d.lastCollection)}/></div></State><section className="panel"><div className="section-title"><div><h2>Source Performance Breakdown</h2><p>Detailed performance per source showing total jobs collected.</p></div></div><State {...performance}><DataTable data={array(performance.data)}/></State></section></>}
+
+function SourceCategories() {
+  const sourceCategories=[{id:1,category:'Official Company Career Sites (مواقع الشركات الرسمية)',registeredSources:12},{id:2,category:'National Platforms - Jadarat (المنصة الوطنية الموحدة للتوظيف)',registeredSources:1},{id:3,category:'Regional Job Boards - Bayt, GulfTalent (منصات التوظيف الإقليمية)',registeredSources:4},{id:4,category:'LinkedIn Jobs',registeredSources:1},{id:5,category:'Global Job Boards (مواقع التوظيف العالمية)',registeredSources:2},{id:6,category:'Mega Projects & Semi-Gov (مواقع المشاريع الكبرى والجهات شبه الحكومية)',registeredSources:5},{id:7,category:'Government Entities (مواقع الجهات الحكومية والهيئات)',registeredSources:8},{id:8,category:'Specialized Gov Platforms (منصات التوظيف الحكومية المتخصصة)',registeredSources:2},{id:9,category:'Recruitment Agencies (مواقع شركات التوظيف والاستقطاب)',registeredSources:3},{id:10,category:'Social Media Channels (حسابات التواصل الاجتماعي المتخصصة بالتوظيف)',registeredSources:0},{id:11,category:'University Career Centers (مواقع الجامعات ومراكز الخريجين)',registeredSources:0},{id:12,category:'Career Fairs & Events (معارض التوظيف والفعاليات المهنية)',registeredSources:0},{id:13,category:'Email Newsletters & Alerts (النشرات البريدية والتنبيهات)',registeredSources:0},{id:14,category:'Chambers of Commerce (غرف التجارة والجمعيات المهنية)',registeredSources:0},{id:15,category:'Applicant Tracking Systems - ATS',registeredSources:18},{id:16,category:'News and Newspaper Ads (إعلانات الصحف والمواقع الإخبارية)',registeredSources:0},{id:17,category:'Direct HR Relationships (العلاقات المباشرة مع الشركات)',registeredSources:0},{id:18,category:'Bootcamps & Training Programs (برامج التدريب المنتهي بالتوظيف)',registeredSources:0}];
+  return <><PageHead title="Source Categories (18 Types)" subtitle="Manage your job sources organized by the official 18 categorization types."/><section className="panel"><div className="section-title"><div><h2>Category Hierarchy</h2><p>Click on any category to view the sources assigned to it.</p></div></div><DataTable data={sourceCategories}/></section></>;
+}
+
+function AiSourceApprovals() {
+  const [sources, setSources] = useState(() => {
+    const saved = localStorage.getItem('ts_dummy_sources');
+    if (saved) return JSON.parse(saved);
+    return [
+      {id: 's1', url: 'careers.sabic.com', organization: 'SABIC', category: 'Type 1: Official Company Career Sites', confidence: '98%'},
+      {id: 's2', url: 'jadarat.sa', organization: 'Jadarat Portal', category: 'Type 2: National Platforms - Jadarat', confidence: '99%'},
+      {id: 's3', url: 'lever.co/unknown-startup', organization: 'Unknown Startup', category: 'Type 15: Applicant Tracking Systems - ATS', confidence: '92%'}
+    ];
+  });
+  
+  const [loadingId, setLoadingId] = useState(null);
+
+  const approve = async (source) => {
+    setLoadingId(source.id);
+    try {
+      await api.approveSource({
+        url: source.url,
+        organization: source.organization,
+        category: source.category
+      });
+      setSources(prev => {
+        const next = prev.filter(s => s.id !== source.id);
+        localStorage.setItem('ts_dummy_sources', JSON.stringify(next));
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save to database. Check console.");
+    } finally {
+      setLoadingId(null);
+    }
+  };
+  
+  const reject = (id) => {
+    setSources(prev => {
+      const next = prev.filter(s => s.id !== id);
+      localStorage.setItem('ts_dummy_sources', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  return <>
+    <PageHead title="AI Source Approvals" subtitle="Review discovered websites or manually add a new source for the AI to scrape."/>
+    
+    <section className="panel" style={{marginBottom: '2rem'}}>
+      <div className="section-title">
+        <div>
+          <h2>Manually Add Source</h2>
+          <p>Directly register a new careers page.</p>
+        </div>
+      </div>
+      <form style={{display: 'flex', gap: '1rem', alignItems: 'flex-end'}} onSubmit={async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        setLoadingId('manual');
+        try {
+          await api.approveSource({
+            organization: fd.get('org'),
+            url: fd.get('url'),
+            category: 'Manual Entry'
+          });
+          e.target.reset();
+          alert('Source successfully added to the database!');
+        } catch (err) {
+          alert('Error: ' + err.message);
+        } finally {
+          setLoadingId(null);
+        }
+      }}>
+        <label style={{flex: 1}}>
+          Company Name
+          <input name="org" required placeholder="e.g. Aramco" />
+        </label>
+        <label style={{flex: 2}}>
+          Careers URL
+          <input name="url" required placeholder="e.g. https://www.aramco.com/en/careers" type="url" />
+        </label>
+        <button type="submit" className="btn btn-primary" disabled={loadingId === 'manual'}>
+          {loadingId === 'manual' ? 'Adding...' : 'Add Source'}
+        </button>
+      </form>
+    </section>
+
+    <section className="panel">
+      <div className="section-title"><div><h2>Pending AI Discovery ({sources.length})</h2><p>Approve a source to officially register it under its category.</p></div></div>
+      {sources.length === 0 ? <Empty text="No pending sources. The AI is still searching the web!"/> : 
+        <div className="job-list">{sources.map(source => 
+          <article className="job-row" key={source.id}>
+            <div className="company-tile">{source.organization[0]}</div>
+            <div className="job-main">
+              <h3>{source.organization}</h3>
+              <p><a href={`https://${source.url}`} target="_blank" rel="noreferrer" style={{color: '#9ca3af', textDecoration: 'underline'}}>{source.url}</a></p>
+              <div className="chips"><span style={{background: '#8b5cf6', color: 'white'}}>Suggested: {source.category}</span><span>AI Confidence: {source.confidence}</span></div>
+            </div>
+            <div className="job-actions">
+              <button className="btn" onClick={() => reject(source.id)} style={{borderColor: '#ef4444', color: '#ef4444'}} disabled={loadingId === source.id}>Reject</button>
+              <button className="btn btn-primary" onClick={() => approve(source)} style={{background: '#10b981', borderColor: '#10b981'}} disabled={loadingId === source.id}>
+                {loadingId === source.id ? 'Saving...' : 'Approve Source'}
+              </button>
+            </div>
+          </article>
+        )}</div>
+      }
+    </section>
+  </>;
+}
 
 function SimpleData({title,subtitle,loader}){const result=useLoad(loader,[]);return <><PageHead title={title} subtitle={subtitle} actions={<button className="btn" onClick={result.reload}><RefreshCw/>Refresh</button>}/><State {...result}><DataTable data={array(result.data)}/></State></>}
 function DataTable({data,actions}){if(!data.length)return <Empty text="No records are available yet."/>;const columns=Object.keys(data[0]).filter(k=>!['payload','details','configuration','snapshot'].includes(k)).slice(0,8);return <div className="table-container"><table><thead><tr>{columns.map(c=><th key={c}>{labelize(c)}</th>)}{actions&&<th>Action</th>}</tr></thead><tbody>{data.map((row,i)=><tr key={row.id||i}>{columns.map(c=><td key={c}>{format(row[c])}</td>)}{actions&&<td>{actions(row)}</td>}</tr>)}</tbody></table></div>}
 function Empty({text}){return <div className="empty"><Archive/><h3>{text}</h3><p>The page is connected and will update when the backend has matching records.</p></div>}
-const array=value=>Array.isArray(value)?value:Array.isArray(value?.content)?value.content:[];
+const array=value=>Array.isArray(value)?value:Array.isArray(value?.content)?value.content:Array.isArray(value?.items)?value.items:[];
 const labelize=value=>String(value).replace(/_/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,c=>c.toUpperCase());
 const date=value=>value?new Date(value).toLocaleString():'Not yet';
 function format(value){if(value===null||value===undefined)return'—';if(typeof value==='boolean')return value?'Yes':'No';if(typeof value==='object')return JSON.stringify(value).slice(0,120);const text=String(value);return text.length>90?text.slice(0,87)+'…':text}

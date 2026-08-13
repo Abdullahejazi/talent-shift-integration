@@ -64,13 +64,19 @@ export const deleteMeeting = id => request(`/api/workspace/meetings/${id}`,{meth
 export const fetchConversations = () => request('/api/workspace/conversations');
 export const fetchMessages = id => request(`/api/workspace/conversations/${id}/messages`);
 export const sendMessage = (id,body) => request(`/api/workspace/conversations/${id}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body})});
-export const fetchAnalytics = () => request('/api/workspace/analytics');
-export const fetchPreferences = () => request('/api/workspace/preferences');
-export const updatePreferences = data => request('/api/workspace/preferences',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+
+
+
+export const approveSource = (source) => request('/api/v1/admin/sources/approve', { 
+  method: 'POST', 
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(source) 
+});
 
 export const fetchSources = () => request('/api/admin/job-sources');
 export const fetchOperations = () => request('/api/admin/job-sources/status');
 export const fetchDailyMetrics = () => request('/api/admin/job-sources/daily-metrics');
+export const fetchSourcePerformance = () => request('/api/admin/job-sources/performance');
 export const fetchDiscoveryHistory = () => request('/api/admin/job-sources/discovery-history');
 export const collectJobs = () => request('/api/admin/jobs/collect',{method:'POST'});
 export const searchNewJobs = () => request('/api/admin/jobs/agent-search',{method:'POST'});

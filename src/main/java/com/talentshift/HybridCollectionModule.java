@@ -194,6 +194,16 @@ class SafeSourceHttpClient {
 
     SourceHttpResponse get(URI uri, SyncCursor cursor) {
         URI current = validate(uri);
+        String urlStr = current.toString();
+        boolean isAtsApi = urlStr.contains("boards-api.greenhouse") || urlStr.contains("api.lever.co") || 
+                           urlStr.contains("smartrecruiters.com") || urlStr.contains("workday") || 
+                           urlStr.contains("ashbyhq") || urlStr.contains("api.breezy") || 
+                           urlStr.contains("recruitee.com") || urlStr.contains("workable.com");
+                           
+        if (!isAtsApi) {
+            current = URI.create("https://r.jina.ai/" + urlStr);
+        }
+
         for (int redirect = 0; redirect <= maxRedirects; redirect++) {
             try {
                 HttpRequest.Builder request = HttpRequest.newBuilder(current).GET().timeout(Duration.ofSeconds(20))
@@ -472,7 +482,6 @@ class BrowserFallbackCollector extends JsonSourceCollector implements Registered
     }
 }
 
-@Component
 class RegistryJobSource implements JobSourceClient {
     private final JobSourceRegistry registry;
     private final List<RegisteredSourceCollector> collectors;

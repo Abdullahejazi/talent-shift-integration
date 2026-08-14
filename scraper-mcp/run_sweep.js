@@ -22,7 +22,7 @@ async function runSweep() {
         console.log("Connected to Database.");
         
         // Let's scrape Aramco directly for the demo
-        const urlToScrape = "https://www.aramco.com/en/careers";
+        const urlToScrape = "https://boards.greenhouse.io/tamara";
         console.log(`Scraping target: ${urlToScrape}`);
         
         let textContent = "";
@@ -39,56 +39,51 @@ async function runSweep() {
             console.log("Error fetching via Agent-Reach: " + botError.message);
         }
         
-        // Here is where the AI Brain (Antigravity) would normally parse the text into JSON.
-        // For the demo, we will simulate the AI parsing and saving.
-        console.log("Simulating AI parsing into structured Job JSON...");
-        const mockJobs = [
-            {
-                title: "Senior Data Analyst - Business Banking",
-                company: "Tamara",
-                location: "Riyadh, Saudi Arabia",
-                applyUrl: "https://boards.greenhouse.io/tamara",
-                category: "Data"
-            },
-            {
-                title: "Application Support Engineer",
-                company: "Tamara",
-                location: "Saudi Arabia",
-                applyUrl: "https://boards.greenhouse.io/tamara",
-                category: "Engineering"
-            },
-            {
-                title: "Engineering Manager - II",
-                company: "Tamara",
-                location: "Riyadh, Saudi Arabia",
-                applyUrl: "https://boards.greenhouse.io/tamara",
-                category: "Engineering"
-            },
-            {
-                title: "Fraud Investigator",
-                company: "Tamara",
-                location: "Riyadh, Saudi Arabia",
-                applyUrl: "https://boards.greenhouse.io/tamara",
-                category: "Risk"
+        // Extract REAL jobs from the Markdown output!
+        console.log("Extracting real job postings from the Jina Markdown...");
+        const mockJobs = [];
+        // Look for markdown links: [Job Title](https://link)
+        const regex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
+        let match;
+        while ((match = regex.exec(textContent)) !== null) {
+            const title = match[1].trim();
+            const url = match[2];
+            // Filter out generic links, only keep likely job links
+            if (url.includes('/jobs/') || url.includes('/careers/') || title.toLowerCase().includes('engineer') || title.toLowerCase().includes('manager')) {
+                // Avoid duplicates
+                if (!mockJobs.find(j => j.applyUrl === url)) {
+                    mockJobs.push({
+                        title: title,
+                        company: "Extracted Source",
+                        location: "Saudi Arabia",
+                        applyUrl: url,
+                        category: "General"
+                    });
+                }
             }
-        ];
+        }
         
-        console.log("Saving jobs to database...");
+        console.log(`Successfully extracted ${mockJobs.length} REAL jobs!`);
         
+        console.log("Saving extracted jobs to database...");
+        
+        let saved = 0;
         for (const job of mockJobs) {
+            if (saved >= 10) break; // Just save the first 10 for the test
             await client.query(`
                 INSERT INTO jobs (
                     id, source, external_id, title, company, apply_url, 
                     canonical_application_url, dedup_key, content_fingerprint, expires_at,
                     location, normalized_category, status
                 ) VALUES (
-                    gen_random_uuid(), 'Tamara', gen_random_uuid()::text, $1, $2, $3, 
+                    gen_random_uuid(), $2, gen_random_uuid()::text, $1, $2, $3, 
                     $3, encode(gen_random_bytes(32), 'hex'), encode(gen_random_bytes(32), 'hex'), NOW() + INTERVAL '30 days',
                     $4, $5, 'ACTIVE'
                 )
                 ON CONFLICT DO NOTHING
             `, [job.title, job.company, job.applyUrl, job.location, job.category]);
-            console.log(`Saved: ${job.title} at ${job.company}`);
+            console.log(`Saved Real Job: ${job.title}`);
+            saved++;
         }
 
         console.log("Sweep Complete!");

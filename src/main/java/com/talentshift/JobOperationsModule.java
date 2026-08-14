@@ -204,6 +204,14 @@ class JobSourceOperationsController {
     List<SourcePerformance> performance(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
             SELECT company, count(*) as jobs FROM jobs GROUP BY company ORDER BY jobs DESC, company ASC
             """).query((rs,n)->new SourcePerformance(rs.getString(1),rs.getLong(2))).list();}
+    @GetMapping("/categories")
+    List<SourceCategoryCount> categories(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
+            SELECT c.id, c.name, c.description, count(s.id) as registered_sources
+            FROM source_categories c
+            LEFT JOIN job_sources s ON c.id = s.category_id AND s.enabled=true
+            GROUP BY c.id ORDER BY c.created_at ASC
+            """).query((rs,n)->new SourceCategoryCount(rs.getObject("id", java.util.UUID.class),rs.getString("name"),rs.getString("description"),rs.getLong("registered_sources"))).list();}
 }
 
 record SourcePerformance(String company, long jobs) {}
+record SourceCategoryCount(java.util.UUID id, String category, String description, long registeredSources) {}

@@ -26,6 +26,7 @@ export async function getMe() { return request('/api/auth/me'); }
 export async function login(email, password) {
   const user = await request('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
   sessionStorage.setItem('talentshift_authenticated','true');
+  csrfToken = null;
   return user;
 }
 export async function register(fullName, email, password) {
@@ -74,6 +75,7 @@ export const approveSource = (source) => request('/api/v1/admin/sources/approve'
 });
 
 export const fetchSources = () => request('/api/admin/job-sources');
+export const fetchSourceCategories = () => request('/api/admin/job-sources/categories');
 export const fetchOperations = () => request('/api/admin/job-sources/status');
 export const fetchDailyMetrics = () => request('/api/admin/job-sources/daily-metrics');
 export const fetchSourcePerformance = () => request('/api/admin/job-sources/performance');

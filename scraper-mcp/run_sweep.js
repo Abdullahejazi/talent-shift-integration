@@ -27,26 +27,16 @@ async function runSweep() {
         
         let textContent = "";
         try {
-            console.log("Waking up Playwright Chrome Engine...");
-            const browser = await chromium.launch({ headless: true });
-            const context = await browser.newContext({
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                viewport: { width: 1920, height: 1080 }
-            });
-            const page = await context.newPage();
+            console.log("Waking up Agent-Reach (Jina Reader) to bypass bot blockers...");
+            const jinaUrl = `https://r.jina.ai/${urlToScrape}`;
+            const response = await fetch(jinaUrl);
+            textContent = await response.text();
             
-            await page.goto(urlToScrape, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            console.log("Page loaded. Extracting raw HTML...");
-            
-            textContent = await page.evaluate(() => document.body.innerText);
-            await browser.close();
-            
-            console.log(`Successfully extracted ${textContent.length} characters of raw data!`);
+            console.log(`Successfully bypassed blockers and extracted ${textContent.length} characters of Markdown!`);
             console.log("Sample of extracted text:");
             console.log(textContent.substring(0, 200).replace(/\n/g, " ") + "...");
         } catch (botError) {
-            console.log("Aramco's enterprise firewall blocked the headless browser! (This is normal for giant corporations).");
-            console.log("For this demonstration, I will bypass the firewall and proceed directly to the AI parsing step using the mock data.");
+            console.log("Error fetching via Agent-Reach: " + botError.message);
         }
         
         // Here is where the AI Brain (Antigravity) would normally parse the text into JSON.

@@ -77,7 +77,7 @@ class SecurityModule {
                         .requestMatchers("/api/admin/**", "/api/integration/**").hasRole("ADMIN")
                         .requestMatchers("/api/jobs/**", "/api/companies/**").permitAll()
                         .anyRequest().authenticated())
-                .csrf(csrf -> csrf.csrfTokenRepository(csrfRepository))
+                .csrf(csrf -> csrf.csrfTokenRepository(csrfRepository).ignoringRequestMatchers("/api/**"))
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(cache -> cache.disable())

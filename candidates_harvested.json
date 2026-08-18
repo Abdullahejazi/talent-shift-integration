@@ -1,0 +1,71 @@
+[
+  {
+    "name": "Khaled Al-Ghashian",
+    "title": "Senior Java & Spring Cloud Engineer",
+    "company": "Al Rajhi Bank Digital Factory",
+    "location": "Riyadh, Saudi Arabia",
+    "avatarColor": "linear-gradient(135deg, #4f46e5, #9333ea)",
+    "experienceYears": 8,
+    "experienceLevel": "Senior",
+    "discipline": "Software Engineering",
+    "matchScore": 99,
+    "verified": true,
+    "status": "Available Immediately",
+    "email": "khaled.ghashian@alrajhibank.com.sa",
+    "phone": "+966 50 789 0123",
+    "linkedin": "linkedin.com/in/khaled-ghashian-dev",
+    "salaryExpectation": "32,000 - 38,000 SAR / mo",
+    "summary": "High-volume banking and instant payment systems engineer with deep expertise in Java 21, Spring Boot 3, Kafka event streaming, and PCI-DSS compliance.",
+    "skills": [
+      "Java 21",
+      "Spring Boot 3",
+      "Spring Cloud",
+      "Kafka",
+      "PostgreSQL",
+      "Oracle",
+      "Docker",
+      "Kubernetes",
+      "Redis",
+      "Microservices"
+    ],
+    "education": [
+      {
+        "degree": "B.S. in Software Engineering",
+        "school": "King Fahd University of Petroleum and Minerals (KFUPM)",
+        "year": "2017",
+        "honors": "First Class Honors"
+      }
+    ],
+    "experience": [
+      {
+        "role": "Lead Backend Engineer",
+        "company": "Al Rajhi Bank",
+        "period": "2021 - Present",
+        "location": "Riyadh, KSA",
+        "description": "Engineered real-time instant payment integration gateway processing 4M+ daily transactions."
+      },
+      {
+        "role": "Software Engineer",
+        "company": "Elm Company",
+        "period": "2017 - 2021",
+        "location": "Riyadh, KSA",
+        "description": "Developed national e-government integration platforms."
+      }
+    ],
+    "certifications": [
+      "Oracle Certified Master Java Developer",
+      "AWS Solutions Architect Associate"
+    ],
+    "languages": [
+      {
+        "name": "Arabic",
+        "level": "Native"
+      },
+      {
+        "name": "English",
+        "level": "Fluent"
+      }
+    ],
+    "id": "c_1_1787043634"
+  }
+]

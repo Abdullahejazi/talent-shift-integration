@@ -406,24 +406,26 @@ class SaudiJobPolicy {
             "\u062a\u0628\u0648\u0643", "\u0627\u0644\u062c\u0628\u064a\u0644",
             "\u064a\u0646\u0628\u0639", "\u0623\u0628\u0647\u0627", "\u0627\u0644\u0637\u0627\u0626\u0641",
             "\u0627\u0644\u0642\u0635\u064a\u0645", "\u0627\u0644\u0639\u0644\u0627");
-    boolean accepts(CollectedJob job) {
-        if ("SA".equalsIgnoreCase(job.countryCode())) return true;
-        String location = Objects.toString(job.location(), "").toLowerCase(Locale.ROOT);
-        if (SAUDI_MARKERS.stream().anyMatch(location::contains)) return true;
-        return job.remote() && globallyAvailable(location) && englishOrArabic(job);
-    }
+            
+    private static final List<String> FOREIGN_MARKERS = List.of(
+            "cairo", "egypt", "dubai", "uae", "united arab emirates", "abu dhabi", 
+            "amman", "jordan", "lebanon", "beirut", "kuwait", "qatar", "doha", "bahrain", "manama",
+            "oman", "muscat", "india", "pakistan", "london", "uk", "united kingdom", "us", "usa", "united states"
+    );
 
-    private static boolean globallyAvailable(String location) {
-        if (location.isBlank()) return false;
-        // The product scope explicitly includes fully remote English/Arabic jobs
-        // outside Saudi Arabia. ATS providers commonly render these as
-        // "Remote - US", "Virtual, EMEA", or "Work from home" rather than the
-        // literal word "Worldwide", so the explicit remote marker is the useful
-        // signal. Foreign on-site and hybrid roles still fail because collectors
-        // do not mark those records as remote.
-        return List.of("remote", "virtual", "work from home", "home-based", "home based",
-                        "worldwide", "world-wide", "anywhere", "global", "emea", "mena", "middle east")
-                .stream().anyMatch(location::contains);
+    boolean accepts(CollectedJob job) {
+        if (job.remote()) return false;
+        String location = Objects.toString(job.location(), "").toLowerCase(Locale.ROOT);
+        String title = Objects.toString(job.title(), "").toLowerCase(Locale.ROOT);
+        
+        if (location.contains("remote") || location.contains("virtual") || location.contains("work from home")) return false;
+        if (title.contains("remote") || title.contains("virtual") || title.contains("work from home")) return false;
+        
+        if (FOREIGN_MARKERS.stream().anyMatch(marker -> location.contains(marker) || title.contains(marker))) return false;
+
+        if ("SA".equalsIgnoreCase(job.countryCode())) return true;
+        if (SAUDI_MARKERS.stream().anyMatch(location::contains)) return true;
+        return false;
     }
 
     private static boolean englishOrArabic(CollectedJob job) {
@@ -629,17 +631,25 @@ class JobRepository {
         int safePage = Math.max(0, page);
         String where = """
                 FROM jobs WHERE status='ACTIVE'
-                  AND (:keyword='' OR title ILIKE :keywordLike OR company ILIKE :keywordLike OR COALESCE(description,'') ILIKE :keywordLike)
+                  AND (:keyword='' OR 
+                       word_similarity(lower(title), lower(:keyword)) > 0.3 OR 
+                       word_similarity(lower(company), lower(:keyword)) > 0.3 OR 
+                       COALESCE(description,'') ILIKE :keywordLike)
                   AND (:location='' OR COALESCE(location,'') ILIKE :locationLike)
                   AND (:type='' OR COALESCE(employment_type,'') ILIKE :typeLike)
                   AND (:source='' OR source=upper(:source))
                   AND (:remote IS NULL OR remote=:remote)
                 """;
         long total = bind(jdbc.sql("SELECT count(*) " + where), k, l, t, s, remote).query(Long.class).single();
+        
+        String orderBy = k.isEmpty() 
+            ? "ORDER BY posted_at DESC NULLS LAST, collected_at DESC" 
+            : "ORDER BY GREATEST(word_similarity(lower(title), lower(:keyword)) * 2.0, word_similarity(lower(company), lower(:keyword)) * 1.5) DESC, posted_at DESC NULLS LAST";
+            
         List<JobView> items = bind(jdbc.sql("""
                 SELECT id, source, title, company, location, country_code, employment_type, remote, salary, category,
                        description, requirements, apply_url, source_url, posted_at, collected_at
-                """ + where + " ORDER BY posted_at DESC NULLS LAST, collected_at DESC LIMIT :limit OFFSET :offset"),
+                """ + where + " " + orderBy + " LIMIT :limit OFFSET :offset"),
                 k, l, t, s, remote).param("limit", safeSize).param("offset", safePage * safeSize)
                 .query(JobRepository::mapJob).list();
         return new JobPage(items, total, safePage, safeSize);

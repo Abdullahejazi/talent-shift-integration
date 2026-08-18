@@ -198,7 +198,8 @@ class SafeSourceHttpClient {
         boolean isAtsApi = urlStr.contains("boards-api.greenhouse") || urlStr.contains("api.lever.co") || 
                            urlStr.contains("smartrecruiters.com") || urlStr.contains("workday") || 
                            urlStr.contains("ashbyhq") || urlStr.contains("api.breezy") || 
-                           urlStr.contains("recruitee.com") || urlStr.contains("workable.com");
+                           urlStr.contains("recruitee.com") || urlStr.contains("workable.com") ||
+                           urlStr.contains("linkedin.com");
                            
         if (!isAtsApi) {
             current = URI.create("https://r.jina.ai/" + urlStr);

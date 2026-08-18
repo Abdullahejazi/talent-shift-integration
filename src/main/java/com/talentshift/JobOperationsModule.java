@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 record SourceHealth(UUID id, String company, String type, String url, boolean enabled, String permission,
         OffsetDateTime lastSuccess, OffsetDateTime lastFailure, OffsetDateTime nextRetry, int failures,
         String lastError, long fetches, long jobsFound, int refreshMinutes) {}
-record OperationsStatus(long activeJobs,long totalSources,long enabledSources,long healthySources,long discoverySearches,
+record OperationsStatus(long activeJobs,long totalSources,long healthySources,long discoverySearches,
         long discoveryTargets,long promotedSeeds,OffsetDateTime lastCollection,int aiCreditLimit,int seedRefreshMinutes) {}
 record DiscoveryHistory(String query,String kind,OffsetDateTime searchedAt,int results,int jobs,int seeds) {}
 record DailyJobOperations(java.time.LocalDate day,long inserted,long activated,long expired,long inactivated,
@@ -59,7 +59,15 @@ class JobLinkVerificationService {
 
     private void verify(Link link) {
         try {
-            http.get(URI.create(link.url()),null);
+            var response = http.get(URI.create(link.url()),null);
+            if (response.body() != null && (response.body().contains("No longer accepting applications") || response.body().contains("This job is no longer available"))) {
+                jdbc.sql("""
+                        UPDATE jobs SET missing_observations=missing_observations+1,
+                          status=CASE WHEN missing_observations+1>=2 THEN 'EXPIRED' ELSE 'PENDING_RECHECK' END,
+                          last_verified_at=now() WHERE id=:id
+                        """).param("id",link.id()).update();
+                return;
+            }
             jdbc.sql("""
                     UPDATE jobs SET status='ACTIVE',missing_observations=0,last_verified_at=now()
                     WHERE id=:id
@@ -179,13 +187,12 @@ class JobSourceOperationsController {
     OperationsStatus status(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
             SELECT (SELECT count(*) FROM jobs WHERE status='ACTIVE') active_jobs,
               (SELECT count(*) FROM job_sources) total_sources,
-              (SELECT count(*) FROM job_sources WHERE enabled=true) enabled_sources,
               (SELECT count(*) FROM job_sources WHERE enabled=true AND consecutive_failures=0) healthy_sources,
               (SELECT count(*) FROM ai_discovery_searches) searches,
               (SELECT count(*) FROM ai_discovery_targets) targets,
               (SELECT count(*) FROM ai_discovery_targets WHERE status='PROMOTED') promoted,
               (SELECT max(finished_at) FROM job_collection_runs) last_collection
-            """).query((rs,n)->new OperationsStatus(rs.getLong("active_jobs"),rs.getLong("total_sources"),rs.getLong("enabled_sources"),rs.getLong("healthy_sources"),rs.getLong("searches"),rs.getLong("targets"),rs.getLong("promoted"),rs.getObject("last_collection",OffsetDateTime.class),aiCredits,seedRefreshMinutes)).single();}
+            """).query((rs,n)->new OperationsStatus(rs.getLong("active_jobs"),rs.getLong("total_sources"),rs.getLong("healthy_sources"),rs.getLong("searches"),rs.getLong("targets"),rs.getLong("promoted"),rs.getObject("last_collection",OffsetDateTime.class),aiCredits,seedRefreshMinutes)).single();}
 
     @PostMapping("/recheck")
     CollectionRequest recheck(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);registry.forceAllDue();return collector.requestManualCollection();}
@@ -211,7 +218,37 @@ class JobSourceOperationsController {
             LEFT JOIN job_sources s ON c.id = s.category_id AND s.enabled=true
             GROUP BY c.id ORDER BY c.created_at ASC
             """).query((rs,n)->new SourceCategoryCount(rs.getObject("id", java.util.UUID.class),rs.getString("name"),rs.getString("description"),rs.getLong("registered_sources"))).list();}
+    @GetMapping("/expired-jobs")
+    List<JobPreview> expiredJobs(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){
+        admin.verify(key,authentication);
+        
+        // Automatically pull expired jobs out of the main system
+        jdbc.sql("UPDATE jobs SET status='EXPIRED' WHERE status='ACTIVE' AND (expires_at <= now() OR missing_observations+1 >= 2)").update();
+        
+        return jdbc.sql("SELECT id, title, company, location, dedup_key, posted_at, expires_at, status FROM jobs WHERE status='EXPIRED' ORDER BY expires_at DESC LIMIT 1000")
+            .query((rs,n)->new JobPreview(rs.getObject("id", java.util.UUID.class),rs.getString("title"),rs.getString("company"),rs.getString("location"),rs.getString("dedup_key"),rs.getObject("posted_at",java.time.OffsetDateTime.class),rs.getObject("expires_at",java.time.OffsetDateTime.class),rs.getString("status"))).list();
+    }
+
+    @GetMapping("/duplicate-jobs")
+    List<JobPreview> duplicateJobs(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){
+        admin.verify(key,authentication);
+        return jdbc.sql("SELECT id, title, company, location, dedup_key, posted_at, expires_at, status FROM jobs WHERE dedup_key IN (SELECT dedup_key FROM jobs WHERE status='ACTIVE' GROUP BY dedup_key HAVING count(*) > 1) AND status='ACTIVE' ORDER BY dedup_key, posted_at DESC LIMIT 1000")
+            .query((rs,n)->new JobPreview(rs.getObject("id", java.util.UUID.class),rs.getString("title"),rs.getString("company"),rs.getString("location"),rs.getString("dedup_key"),rs.getObject("posted_at",java.time.OffsetDateTime.class),rs.getObject("expires_at",java.time.OffsetDateTime.class),rs.getString("status"))).list();
+    }
+
+    @PostMapping("/execute-expire")
+    void executeExpire(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){
+        admin.verify(key,authentication);
+        jdbc.sql("UPDATE jobs SET status='EXPIRED' WHERE status='ACTIVE' AND (expires_at <= now() OR missing_observations+1 >= 2)").update();
+    }
+
+    @PostMapping("/execute-deduplicate")
+    void executeDeduplicate(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){
+        admin.verify(key,authentication);
+        jdbc.sql("UPDATE jobs SET status='EXPIRED' WHERE status='ACTIVE' AND id NOT IN (SELECT DISTINCT ON (dedup_key) id FROM jobs WHERE status='ACTIVE' ORDER BY dedup_key, posted_at DESC)").update();
+    }
 }
 
 record SourcePerformance(String company, long jobs) {}
 record SourceCategoryCount(java.util.UUID id, String category, String description, long registeredSources) {}
+record JobPreview(java.util.UUID id, String title, String company, String location, String dedupKey, java.time.OffsetDateTime postedAt, java.time.OffsetDateTime expiresAt, String status) {}

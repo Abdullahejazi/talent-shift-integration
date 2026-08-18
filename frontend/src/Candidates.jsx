@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search, Filter, Briefcase, MapPin, GraduationCap, CheckCircle2,
   Download, Eye, Star, Mail, Phone, ExternalLink, Sparkles,
@@ -378,6 +378,7 @@ export async function collectWithCheckLoop(targetCount = 250, targetRole = 'All 
 }
 
 export default function Candidates() {
+  // Always start from verified pool — API fetch will replace if real data available
   const [candidates, setCandidates] = useState(() => {
     localStorage.removeItem('ts_candidates_pool');
     localStorage.removeItem('ts_candidates_pool_v2');
@@ -385,9 +386,11 @@ export default function Candidates() {
     localStorage.removeItem('ts_candidates_pool_v4');
     localStorage.removeItem('ts_candidates_pool_v5');
     localStorage.removeItem('ts_candidates_pool_v6');
-    // Always start fresh from the verified pool on mount
     return VERIFIED_CANDIDATES_POOL.map(c => ({ ...c, verified: true, linkedinVerified: true, contactVerified: true }));
   });
+  const [isLoadingFromAPI, setIsLoadingFromAPI] = useState(false);
+  const [usingRealData, setUsingRealData] = useState(false);
+  const [collectionStatus, setCollectionStatus] = useState(null);
 
   const [search, setSearch] = useState('');
   const [selectedDiscipline, setSelectedDiscipline] = useState('All Disciplines');
@@ -415,7 +418,64 @@ export default function Candidates() {
     deletedCount: 0
   });
 
-  // Automated Continuous Background Refresher (Method A: Refresh Pool)
+  // Fetch real LinkedIn candidates from backend API
+  const fetchFromAPI = useCallback(async () => {
+    setIsLoadingFromAPI(true);
+    try {
+      // Check collection status first
+      const statusRes = await fetch('/api/candidates/collection-status');
+      if (statusRes.ok) {
+        const status = await statusRes.json();
+        setCollectionStatus(status);
+      }
+
+      const res = await fetch('/api/candidates?page=0&size=500');
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      const data = await res.json();
+
+      if (data.items && data.items.length > 0) {
+        // Map API shape → UI shape
+        const realCandidates = data.items.map(c => ({
+          id: c.id,
+          name: c.fullName,
+          title: c.title || c.headline || 'Professional',
+          company: c.company || 'Independent',
+          location: c.location || 'Saudi Arabia',
+          linkedin: c.linkedinUrl,
+          discipline: c.discipline || 'Software Engineering',
+          experienceYears: c.experienceYears || 3,
+          skills: c.skills || [],
+          email: c.email || '',
+          phone: c.phone || '',
+          summary: c.websiteUrl || '',
+          status: c.isOpenToWork ? 'Open to Work' : 'Employed',
+          verified: true,
+          linkedinVerified: true,
+          contactVerified: !!c.email,
+          profilePhoto: c.profilePhotoUrl || null,
+          realLinkedIn: true, // flag: this is a real profile from Proxycurl
+        }));
+        setCandidates(realCandidates);
+        setUsingRealData(true);
+        setAutoRefresherStats(prev => ({
+          ...prev,
+          verifiedCount: realCandidates.length,
+          lastRun: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        }));
+        showToast(`✅ Loaded ${realCandidates.length} real LinkedIn profiles from database`);
+      }
+    } catch (e) {
+      // API not ready yet — stay on verified pool fallback
+      console.info('[Candidates] API not ready, using verified pool:', e.message);
+    } finally {
+      setIsLoadingFromAPI(false);
+    }
+  }, []);
+
+  // Fetch real data on mount
+  useEffect(() => { fetchFromAPI(); }, [fetchFromAPI]);
+
+  // Auto-refresh background cleaner (runs on verified pool data when API not available)
   useEffect(() => {
     const runAutoRefresher = () => {
       setCandidates(prev => {
@@ -441,30 +501,11 @@ export default function Candidates() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleManualRefreshAndClean = () => {
-    // Merge current live candidates with the verified pool, then scan/clean everything
-    const combined = [...candidates];
-    // Add any verified pool entries not already present
-    const existingIds = new Set(combined.map(c => c.id));
-    for (const c of VERIFIED_CANDIDATES_POOL) {
-      if (!existingIds.has(c.id)) combined.push(c);
-    }
 
-    const { cleanPool, stats } = refreshPool(combined);
-    setCandidates(cleanPool);
+  const handleManualRefreshAndClean = async () => {
+    showToast('🔄 Fetching latest real LinkedIn profiles from database...');
     setCurrentPage(0);
-    setAutoRefresherStats({
-      status: 'Active',
-      lastRun: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      verifiedCount: cleanPool.length,
-      correctedCount: stats.correctedContactCount,
-      deletedCount: stats.deletedBrokenCount
-    });
-    localStorage.setItem('ts_candidates_pool_v6', JSON.stringify(cleanPool));
-    const msg = stats.deletedBrokenCount > 0
-      ? `⚡ Refresh Complete: Scanned ${stats.totalScanned} CVs — Kept ${cleanPool.length} verified, Deleted ${stats.deletedBrokenCount} broken profiles`
-      : `✅ Pool Clean: All ${cleanPool.length} CVs verified with active LinkedIn profiles`;
-    showToast(msg);
+    await fetchFromAPI();
   };
 
 

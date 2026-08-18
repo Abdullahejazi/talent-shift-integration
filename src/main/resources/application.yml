@@ -125,3 +125,8 @@ app:
   storage:
     upload-dir: ${APP_UPLOAD_DIR:uploads}
     max-bytes: ${UPLOAD_MAX_BYTES:5242880}
+  candidates:
+    github-token: ${GITHUB_TOKEN:}
+    collect-on-startup: ${CANDIDATE_COLLECTION_ON_STARTUP:true}
+    refresh-delay-ms: ${CANDIDATE_REFRESH_DELAY_MS:86400000}
+    max-per-query: ${CANDIDATE_MAX_PER_QUERY:30}

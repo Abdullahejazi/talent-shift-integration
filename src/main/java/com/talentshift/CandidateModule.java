@@ -241,9 +241,11 @@ class TorreCandidateSource implements CandidateSourceClient {
 
     private final RestClient searchHttp;
     private final RestClient bioHttp;
+    private final CandidateRepository repo;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    TorreCandidateSource() {
+    TorreCandidateSource(CandidateRepository repo) {
+        this.repo = repo;
         this.searchHttp = RestClient.builder()
             .baseUrl("https://search.torre.co")
             .defaultHeader("Accept", "application/json")
@@ -284,7 +286,10 @@ class TorreCandidateSource implements CandidateSourceClient {
                     try {
                         Thread.sleep(250); // Be respectful
                         Optional<CollectedCandidate> cc = fetchFullBio(username);
-                        cc.ifPresent(results::add);
+                        cc.ifPresent(c -> {
+                            results.add(c);
+                            try { repo.upsert(c); } catch (Exception e) { log.warn("DB save failed: {}", e.getMessage()); }
+                        });
                     } catch (Exception e) {
                         log.warn("[Torre.co] Error parsing bio for user {}: {}", username, e.getMessage());
                     }
@@ -419,9 +424,11 @@ class GitHubCandidateSource implements CandidateSourceClient {
     );
 
     private final RestClient http;
+    private final CandidateRepository repo;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    GitHubCandidateSource(@Value("${app.candidates.github-token:}") String token) {
+    GitHubCandidateSource(CandidateRepository repo, @Value("${app.candidates.github-token:}") String token) {
+        this.repo = repo;
         var b = RestClient.builder()
             .baseUrl("https://api.github.com")
             .defaultHeader("Accept", "application/vnd.github+json")
@@ -457,7 +464,10 @@ class GitHubCandidateSource implements CandidateSourceClient {
                         seen.add(login);
                         try {
                             Thread.sleep(150);
-                            buildProfile(login).ifPresent(results::add);
+                            buildProfile(login).ifPresent(c -> {
+                                results.add(c);
+                                try { repo.upsert(c); } catch (Exception e) { log.warn("DB save failed: {}", e.getMessage()); }
+                            });
                         } catch (Exception e) {
                             log.warn("[GitHub] User {} error: {}", login, e.getMessage());
                         }
@@ -487,6 +497,9 @@ class GitHubCandidateSource implements CandidateSourceClient {
         int    repos      = u.path("public_repos").asInt(0);
 
         String linkedin   = extractLinkedIn(bio, blog);
+        if (linkedin == null) {
+            linkedin = fetchLinkedInFromSocials(login);
+        }
         if (linkedin == null) return Optional.empty();
         String profileUrl = linkedin;
         String handle     = linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "");
@@ -524,6 +537,26 @@ class GitHubCandidateSource implements CandidateSourceClient {
             }
             return new ArrayList<>(seen);
         } catch (Exception e) { return List.of(); }
+    }
+
+    private String fetchLinkedInFromSocials(String login) {
+        try {
+            String uri = "/users/" + login + "/social_accounts";
+            String body = http.get().uri(uri).retrieve().body(String.class);
+            JsonNode root = mapper.readTree(body);
+            if (root.isArray()) {
+                for (JsonNode sa : root) {
+                    String provider = sa.path("provider").asText("");
+                    String url = sa.path("url").asText("");
+                    if ("linkedin".equalsIgnoreCase(provider) || url.contains("linkedin.com")) {
+                        return url;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return null;
     }
 
     private static String cleanAt(String s) {
@@ -606,9 +639,11 @@ class StackOverflowCandidateSource implements CandidateSourceClient {
     private static final Logger log = LoggerFactory.getLogger(StackOverflowCandidateSource.class);
 
     private final RestClient http;
+    private final CandidateRepository repo;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    StackOverflowCandidateSource() {
+    StackOverflowCandidateSource(CandidateRepository repo) {
+        this.repo = repo;
         this.http = RestClient.builder()
             .baseUrl("https://api.stackexchange.com/2.3")
             .defaultHeader("Accept", "application/json")
@@ -667,10 +702,12 @@ class StackOverflowCandidateSource implements CandidateSourceClient {
 
                 log.info("[StackOverflow] ✓ Collected profile: {} ({}) @ {}", name, title, location);
 
-                results.add(new CollectedCandidate(
+                CollectedCandidate c = new CollectedCandidate(
                     "STACKOVERFLOW", profileUrl, handle, name, title, title,
                     null, location, discipline, expYears, List.of(), email, null,
-                    sb.toString(), null, photo, false));
+                    sb.toString(), null, photo, false);
+                results.add(c);
+                try { repo.upsert(c); } catch (Exception e) { log.warn("DB save failed: {}", e.getMessage()); }
             }
         } catch (Exception e) {
             log.warn("[StackOverflow] Collection failed: {}", e.getMessage());
@@ -700,9 +737,11 @@ class HackerNewsCandidateSource implements CandidateSourceClient {
     private static final Pattern LINKEDIN_PATTERN = Pattern.compile("(?:https?://)?(?:www\\.)?linkedin\\.com/in/([\\w-]+)");
 
     private final RestClient http;
+    private final CandidateRepository repo;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    HackerNewsCandidateSource() {
+    HackerNewsCandidateSource(CandidateRepository repo) {
+        this.repo = repo;
         this.http = RestClient.builder().baseUrl("https://hacker-news.firebaseio.com/v0")
             .defaultHeader("Accept", "application/json").build();
     }
@@ -766,10 +805,12 @@ class HackerNewsCandidateSource implements CandidateSourceClient {
 
                         log.info("[HackerNews] ✓ Collected candidate: {} ({})", name, title);
 
-                        results.add(new CollectedCandidate(
+                        CollectedCandidate c = new CollectedCandidate(
                             "HACKERNEWS", profileUrl, handle, name, title, title,
                             null, location, discipline, 5, List.of(), email, null,
-                            sb.toString(), null, null, true));
+                            sb.toString(), null, null, true);
+                        results.add(c);
+                        try { repo.upsert(c); } catch (Exception e) { log.warn("DB save failed: {}", e.getMessage()); }
 
                     } catch (Exception e) {
                         log.warn("[HackerNews] Comment {} parsing error: {}", commentId, e.getMessage());

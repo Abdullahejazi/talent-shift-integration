@@ -144,6 +144,12 @@ class CandidateRepository {
             .update();
     }
 
+    @Transactional
+    void deleteNonLinkedIn() {
+        db.sql("DELETE FROM linkedin_candidates WHERE linkedin_url NOT LIKE '%linkedin.com/in/%'").update();
+    }
+
+
     long count() {
         return db.sql("SELECT COUNT(*) FROM linkedin_candidates WHERE is_active = true")
                  .query(Long.class).single();
@@ -315,10 +321,9 @@ class TorreCandidateSource implements CandidateSourceClient {
             }
         }
 
-        String profileUrl = linkedin != null ? linkedin : (github != null ? github : "https://torre.ai/" + username);
-        String handle     = linkedin != null
-            ? linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "")
-            : "torre:" + username;
+        if (linkedin == null) return Optional.empty();
+        String profileUrl = linkedin;
+        String handle     = linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "");
 
         // Parse skills
         List<String> skills = new ArrayList<>();
@@ -482,10 +487,9 @@ class GitHubCandidateSource implements CandidateSourceClient {
         int    repos      = u.path("public_repos").asInt(0);
 
         String linkedin   = extractLinkedIn(bio, blog);
-        String profileUrl = linkedin != null ? linkedin : githubUrl;
-        String handle     = linkedin != null
-            ? linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "")
-            : "github:" + login;
+        if (linkedin == null) return Optional.empty();
+        String profileUrl = linkedin;
+        String handle     = linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "");
 
         List<String> langs = getLanguages(login, 8);
         String discipline  = inferDiscipline(bio, company, langs);
@@ -644,10 +648,10 @@ class StackOverflowCandidateSource implements CandidateSourceClient {
                 String linkedin  = GitHubCandidateSource.extractLinkedIn(about, website);
                 if (linkedin == null && website != null && website.contains("linkedin.com")) linkedin = website;
 
-                String profileUrl = linkedin != null ? linkedin : soUrl;
-                String handle     = linkedin != null
-                    ? linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "")
-                    : "so:" + u.path("user_id").asText();
+                if (linkedin == null) continue;
+
+                String profileUrl = linkedin;
+                String handle     = linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "");
 
                 String email = extractEmail(about);
                 String discipline = GitHubCandidateSource.inferDiscipline(about, null, List.of());
@@ -747,10 +751,10 @@ class HackerNewsCandidateSource implements CandidateSourceClient {
                             if (SAUDI_PATTERN.matcher(p).find()) { location = p.trim(); break; }
                         }
 
-                        String profileUrl = linkedin != null ? linkedin : "https://news.ycombinator.com/user?id=" + author;
-                        String handle     = linkedin != null
-                            ? linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "")
-                            : "hn:" + author;
+                        if (linkedin == null) continue;
+
+                        String profileUrl = linkedin;
+                        String handle     = linkedin.replaceAll("https?://(www\\.)?linkedin\\.com/in/", "").replaceAll("/$", "");
 
                         String discipline = GitHubCandidateSource.inferDiscipline(cleanText, role, List.of());
                         String title = role.length() < 100 ? role : GitHubCandidateSource.inferTitle(cleanText, List.of(), discipline);
@@ -816,6 +820,7 @@ class CandidateCollectorService {
     synchronized void collect() {
         if (collecting) { log.info("[CandidateCollector] Collection already running."); return; }
         collecting = true;
+        try { repo.deleteNonLinkedIn(); } catch (Exception e) { log.warn("Cleanup failed: " + e.getMessage()); }
         int total = 0;
         try {
             for (CandidateSourceClient source : sources) {

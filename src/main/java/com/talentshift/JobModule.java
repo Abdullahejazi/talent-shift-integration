@@ -414,12 +414,8 @@ class SaudiJobPolicy {
     );
 
     boolean accepts(CollectedJob job) {
-        if (job.remote()) return false;
         String location = Objects.toString(job.location(), "").toLowerCase(Locale.ROOT);
         String title = Objects.toString(job.title(), "").toLowerCase(Locale.ROOT);
-        
-        if (location.contains("remote") || location.contains("virtual") || location.contains("work from home")) return false;
-        if (title.contains("remote") || title.contains("virtual") || title.contains("work from home")) return false;
         
         if (FOREIGN_MARKERS.stream().anyMatch(marker -> location.contains(marker) || title.contains(marker))) return false;
 

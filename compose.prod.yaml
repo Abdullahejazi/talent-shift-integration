@@ -1,47 +1,29 @@
 name: talentshift-core-prod
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: always
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-talentshift}
-      POSTGRES_USER: ${POSTGRES_USER:-talentshift}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes: 
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-talentshift} -d ${POSTGRES_DB:-talentshift}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   app:
     image: talentshift-core:latest
     build: {context: ., dockerfile: Dockerfile}
     restart: always
     environment:
-      # Read the DB URL entirely from environment to allow external DBs (like DigitalOcean)
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/${POSTGRES_DB:-talentshift}}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-${POSTGRES_USER:-talentshift}}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${POSTGRES_PASSWORD}}
-      
+      # DigitalOcean Managed PostgreSQL
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+
       # Turn OFF demo in production
       APP_DEMO_USER_ENABLED: "false"
-      
-      # Enforce secure cookies in production (if using HTTPS)
-      # COOKIE_SECURE: "true"
 
       # Admin Setup
       APP_ADMIN_USER_ENABLED: "true"
       APP_ADMIN_EMAIL: ${APP_ADMIN_EMAIL:-admin@talentshift.local}
       APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD}
-      APP_ADMIN_KEY: ${APP_ADMIN_KEY}
+      APP_ADMIN_KEY: ${APP_ADMIN_KEY:-}
 
       # Job Settings
       JOB_COLLECTION_ON_STARTUP: "true"
-      JOB_VERIFICATION_CRON: "0 0 12 * * *"
-      
+      JOB_VERIFICATION_CRON: ${JOB_VERIFICATION_CRON:-0 0 */3 * * *}
+
       # Optional AI
       AI_ENABLED: "false"
 
@@ -49,7 +31,7 @@ services:
       UPLOAD_MAX_BYTES: 5242880
     ports:
       - "127.0.0.1:8081:8081"
-    volumes: 
+    volumes:
       - uploads_data:/app/uploads
       - logs_data:/app/logs
     healthcheck:
@@ -59,6 +41,5 @@ services:
       retries: 5
 
 volumes:
-  postgres_data:
   uploads_data:
   logs_data:

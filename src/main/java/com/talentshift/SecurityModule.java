@@ -88,7 +88,10 @@ class SecurityModule {
                 .logout(logout -> logout.disable())
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                                "default-src 'self'; script-src 'self'; "
+                                        + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                                        + "font-src 'self' https://fonts.gstatic.com; "
+                                        + "img-src 'self' data:; "
                                         + "connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"))
                         .frameOptions(frame -> frame.deny())
                         .referrerPolicy(referrer -> referrer.policy(

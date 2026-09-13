@@ -177,11 +177,11 @@ class JobEnrichmentService {
 @RequestMapping("/api/admin/job-sources")
 class JobSourceOperationsController {
     private final JdbcClient jdbc; private final AdminKeyVerifier admin; private final JobSourceRegistry registry;
-    private final JobCollectorService collector; private final int aiCredits; private final int seedRefreshMinutes;
+    private final JobCollectorService collector; private final JobLinkVerificationService verification; private final int aiCredits; private final int seedRefreshMinutes;
     JobSourceOperationsController(JdbcClient jdbc,AdminKeyVerifier admin,JobSourceRegistry registry,JobCollectorService collector,
-
+            JobLinkVerificationService verification,
             @Value("${app.jobs.tavily-new-job-search-credits:200}")int aiCredits,
-            @Value("${app.jobs.seed-refresh-minutes:60}")int seedRefreshMinutes){this.jdbc=jdbc;this.admin=admin;this.registry=registry;this.collector=collector;this.aiCredits=Math.max(1,Math.min(aiCredits,10_000));this.seedRefreshMinutes=Math.max(5,seedRefreshMinutes);}
+            @Value("${app.jobs.seed-refresh-minutes:60}")int seedRefreshMinutes){this.jdbc=jdbc;this.admin=admin;this.registry=registry;this.collector=collector;this.verification=verification;this.aiCredits=Math.max(1,Math.min(aiCredits,10_000));this.seedRefreshMinutes=Math.max(5,seedRefreshMinutes);}
 
     @GetMapping("/status")
     OperationsStatus status(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);return jdbc.sql("""
@@ -195,7 +195,12 @@ class JobSourceOperationsController {
             """).query((rs,n)->new OperationsStatus(rs.getLong("active_jobs"),rs.getLong("total_sources"),rs.getLong("healthy_sources"),rs.getLong("searches"),rs.getLong("targets"),rs.getLong("promoted"),rs.getObject("last_collection",OffsetDateTime.class),aiCredits,seedRefreshMinutes)).single();}
 
     @PostMapping("/recheck")
-    CollectionRequest recheck(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){admin.verify(key,authentication);registry.forceAllDue();return collector.requestManualCollection();}
+    CollectionRequest recheck(@RequestHeader(name="X-Admin-Key",required=false)String key,Authentication authentication){
+        admin.verify(key,authentication);
+        registry.forceAllDue();
+        Thread.startVirtualThread(verification::verifyAtNoon);
+        return collector.requestManualCollection();
+    }
 
 
 

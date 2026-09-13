@@ -4,7 +4,12 @@ async function decode(response) {
   const text = await response.text();
   let body = null;
   if (text) { try { body = JSON.parse(text); } catch { body = text; } }
-  if (!response.ok) throw new Error(body?.message || body?.detail || `Request failed (${response.status})`);
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      sessionStorage.removeItem('talentshift_authenticated');
+    }
+    throw new Error(body?.message || body?.detail || `Request failed (${response.status})`);
+  }
   return body;
 }
 

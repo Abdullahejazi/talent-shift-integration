@@ -75,6 +75,7 @@
                     <workingDirectory>frontend</workingDirectory>
                     <nodeVersion>v22.14.0</nodeVersion>
                     <yarnVersion>v1.22.22</yarnVersion>
+                    <skip>${frontend.skip}</skip>
                 </configuration>
                 <executions>
                     <execution>

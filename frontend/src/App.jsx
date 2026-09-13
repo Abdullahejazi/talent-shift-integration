@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Activity, Archive, BriefcaseBusiness, Building2, CalendarDays, CheckCircle2, ChevronRight,
-  CircleUserRound, Database, FileClock, GitMerge, Heart, Inbox, LayoutDashboard, ListChecks,
-  LogOut, MessageSquare, Moon, Network, Play, RefreshCw, Search, Send, Settings,
-  ShieldCheck, Sparkles, Sun, Workflow, XCircle, UserCheck, UserPlus
+  Activity, Archive, BriefcaseBusiness, ChevronRight,
+  CircleUserRound, Database, ListChecks, LogOut,
+  Moon, Play, RefreshCw, Search, ShieldCheck,
+  Sparkles, Sun, Workflow, XCircle
 } from 'lucide-react';
 import * as api from './api';
 import Candidates from './Candidates';
@@ -38,14 +38,12 @@ function App(){
   useEffect(()=>{
     api.getMe()
       .then(acceptUser)
-      .catch(()=>{
-        const demoAuth = sessionStorage.getItem('talentshift_demo_user');
-        if (demoAuth) {
-          try { acceptUser(JSON.parse(demoAuth)); } catch(e) { setUser(null); }
-        } else {
-          // Auto sign-in to demo admin for local testing if offline
-          const defaultAdmin = { id: 'admin-1', displayName: 'Admin Personnel', email: 'admin@talentshift.ai', role: 'ADMIN' };
-          acceptUser(defaultAdmin);
+      .catch(async ()=>{
+        try {
+          const admin = await api.login('admin@talentshift.ai', 'ChangeThisDemoPassword123!');
+          acceptUser(admin);
+        } catch(err) {
+          setUser(null);
         }
       })
       .finally(()=>setChecking(false));
@@ -73,10 +71,19 @@ function Login({onLogin,theme,setTheme}){
   const[error,setError]=useState('');
   const[busy,setBusy]=useState(false);
 
-  const handleDemoSignIn=()=>{
-    const demoAdmin = { id: 'admin-1', displayName: 'Admin Personnel', email: 'admin@talentshift.ai', role: 'ADMIN' };
-    sessionStorage.setItem('talentshift_demo_user', JSON.stringify(demoAdmin));
-    onLogin(demoAdmin);
+  const handleDemoSignIn=async()=>{
+    setBusy(true);
+    setError('');
+    try {
+      const user = await api.login('admin@talentshift.ai', 'ChangeThisDemoPassword123!');
+      onLogin(user);
+    } catch(err) {
+      const demoAdmin = { id: 'admin-1', displayName: 'Admin Personnel', email: 'admin@talentshift.ai', role: 'ADMIN' };
+      sessionStorage.setItem('talentshift_demo_user', JSON.stringify(demoAdmin));
+      onLogin(demoAdmin);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return <div className="login-shell">
@@ -101,7 +108,7 @@ function Login({onLogin,theme,setTheme}){
   </div>;
 }
 
-function Page({id,user}){switch(id){
+function Page({id}){switch(id){
   case'operations':return <Operations/>;case'cleanup':return <DatabaseCleanup/>;case'categories':return <SourceCategories/>;case'approvals':return <AiSourceApprovals/>;case'jobs':return <Jobs/>;case'candidates':return <Candidates/>;default:return <Operations/>}}
 
 function PageHead({title,subtitle,actions}){return <div className="page-head"><div><h1>{title}</h1><p>{subtitle}</p></div>{actions&&<div className="page-actions">{actions}</div>}</div>}
@@ -154,11 +161,17 @@ function JobBrowser(){
   </>;
 }
 
+<<<<<<< HEAD
 function JobRows({jobs}){if(!jobs.length)return <div className="state-card">No jobs matched this view.</div>;return <div className="job-list">{jobs.map(job=><article className="job-row" key={job.id}><div className="company-tile">{(job.company||job.organization_name||'T')[0]}</div><div className="job-main"><h3>{job.title}</h3><p>{job.company||job.organization_name} · {job.location||'Location flexible'}</p><div className="chips"><span>{job.employmentType||job.employment_type||'Open role'}</span><span style={{background: 'var(--primary)', color: 'var(--primary-foreground)'}}>{job.source === 'SEED_COMPANIES' ? (job.company || 'Local Seed') : (job.source||'Verified source')}</span><span style={{background:'var(--surface-alt)',color:'var(--muted)'}}><FileClock style={{width:'0.8rem',height:'0.8rem',display:'inline',marginRight:'4px'}}/>{date(job.collectedAt||job.created_at)}</span></div></div><div className="job-actions"><a className="btn btn-primary" href={job.applyUrl||job.apply_url||job.canonical_application_url} target="_blank" rel="noreferrer">Open application link</a></div></article>)}</div>}
 
 function Operations(){const status=useLoad(api.fetchOperations,[]);const metrics=useLoad(api.fetchDailyMetrics,[]);const performance=useLoad(api.fetchSourcePerformance,[]);const[action,setAction]=useState('');const[operationError,setOperationError]=useState('');const run=async(fn,label)=>{setAction(label);setOperationError('');try{await fn();await status.reload();}catch(error){setOperationError(error.message)}finally{setAction('')}};const d=status.data||{};
 const candidateCount=useMemo(()=>{const saved=localStorage.getItem('ts_candidates_pool_v6')||localStorage.getItem('ts_candidates_pool_v5');if(saved){try{const parsed=JSON.parse(saved);return parsed.length;}catch(e){}}return 0;},[action]);
 return <><PageHead title="Collection control center" subtitle="Private administrator controls for collection, verification, discovery, and database maintenance." actions={<><button className="btn" onClick={()=>run(api.recheckSources,'Rechecking sources')}><RefreshCw/> Recheck sources</button><button className="btn" onClick={()=>run(api.collectJobs,'Collecting jobs')}><Play/> Run collection</button><button className="btn btn-primary" onClick={()=>location.hash='candidates'} style={{background:'linear-gradient(135deg, #10b981, #059669)',borderColor:'#10b981'}}><Sparkles style={{width:'1rem',height:'1rem',marginRight:'0.35rem'}}/> Run CV Collection</button></>}/>{action&&<div className="notice">{action}… automatic schedules remain active.</div>}{operationError&&<div className="error-banner" role="alert">{operationError}</div>}<State {...status}><div className="metrics-grid"><Stat label="Active jobs" value={d.activeJobs} detail="Visible to candidates"/><div style={{cursor:'pointer'}} onClick={()=>location.hash='candidates'} title="Click to view CV Candidates"><Stat label="CV Candidates" value={candidateCount} detail="Verified talent pool" icon={CircleUserRound}/></div><Stat label="Expired jobs" value={d.expiredJobs} detail="Hidden from search"/><Stat label="Total sources" value={d.totalSources}/><Stat label="Healthy sources" value={d.healthySources}/><Stat label="Last collection" value={date(d.lastCollection)}/></div></State><div className="section-title" style={{marginTop:'2rem'}}><div><h2>Verified Jobs Database</h2><p>Live view of collected jobs with full filtering capabilities.</p></div></div><JobBrowser/></>}
+=======
+function Operations(){const status=useLoad(api.fetchOperations,[]);const performance=useLoad(api.fetchSourcePerformance,[]);const[action,setAction]=useState('');const[operationError,setOperationError]=useState('');const run=async(fn,label)=>{setAction(label);setOperationError('');try{await fn();await status.reload()}catch(error){setOperationError(error.message)}finally{setAction('')}};const d=status.data||{};
+const candidateCount=useMemo(()=>{const saved=localStorage.getItem('ts_candidates_pool_v6')||localStorage.getItem('ts_candidates_pool_v5');if(saved){try{const parsed=JSON.parse(saved);return parsed.length;}catch(e){}}return 0;},[]);
+return <><PageHead title="Collection control center" subtitle="Private administrator controls for collection, verification, discovery, and database maintenance." actions={<><button className="btn" onClick={()=>run(api.recheckSources,'Rechecking sources')}><RefreshCw/> Recheck sources</button><button className="btn" onClick={()=>run(api.collectJobs,'Collecting jobs')}><Play/> Run collection</button><button className="btn btn-primary" onClick={()=>location.hash='candidates'} style={{background:'linear-gradient(135deg, #10b981, #059669)',borderColor:'#10b981'}}><Sparkles style={{width:'1rem',height:'1rem',marginRight:'0.35rem'}}/> Run CV Collection</button></>}/>{action&&<div className="notice">{action}… automatic schedules remain active.</div>}{operationError&&<div className="error-banner" role="alert">{operationError}</div>}<State {...status}><div className="metrics-grid"><Stat label="Active jobs" value={d.activeJobs} detail="Visible to candidates"/><div style={{cursor:'pointer'}} onClick={()=>location.hash='candidates'} title="Click to view CV Candidates"><Stat label="CV Candidates" value={candidateCount} detail="Verified talent pool" icon={CircleUserRound}/></div><Stat label="Expired jobs" value={d.expiredJobs} detail="Hidden from search"/><Stat label="Total sources" value={d.totalSources}/><Stat label="Healthy sources" value={d.healthySources}/><Stat label="Last collection" value={date(d.lastCollection)}/></div></State><section className="panel"><div className="section-title"><div><h2>Source Performance Breakdown</h2><p>Detailed performance per source showing total jobs collected.</p></div></div><State {...performance}><DataTable data={array(performance.data)}/></State></section></>}
+>>>>>>> 88f6bd1 (Fix admin authentication, link verification triggers, and UI session bootstrap)
 
 function DatabaseCleanup(){
   const expired = useLoad(api.fetchExpiredJobs, []);

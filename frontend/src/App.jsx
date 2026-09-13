@@ -117,16 +117,24 @@ function JobBrowser(){
   const[locationValue,setLocation]=useState('');
   const[sourceValue,setSource]=useState('');
   const[page,setPage]=useState(0);
-  const params=useMemo(()=>({keyword:q,location:locationValue,source:sourceValue,remote:false,page,size:100}),[q,locationValue,sourceValue,page]);
+  const params=useMemo(()=>({keyword:q,location:locationValue,source:sourceValue,remote:false,page,size:10}),[q,locationValue,sourceValue,page]);
   const result=useLoad(()=>api.fetchJobs(params),[q,locationValue,sourceValue,page]);
   useEffect(()=>setPage(0),[q,locationValue,sourceValue]);
-  const totalPages=result.data?.total?Math.ceil(result.data.total/100):0;
+  const totalPages=result.data?.total?Math.ceil(result.data.total/10):0;
   return <>
     <div className="search-rail">
       <Search/>
       <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search roles or skills"/>
       <input value={locationValue} onChange={e=>setLocation(e.target.value)} placeholder="Location"/>
-      <input value={sourceValue} onChange={e=>setSource(e.target.value)} placeholder="Source / Company"/>
+      <select value={sourceValue} onChange={e=>setSource(e.target.value)}>
+        <option value="">All Sources</option>
+        <option value="Salla">Salla (سلة)</option>
+        <option value="Foodics">Foodics (فودكس)</option>
+        <option value="Jahez">Jahez (جاهز)</option>
+        <option value="Zid">Zid (زد)</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="Workable">Workable (Global)</option>
+      </select>
     </div>
     <section className="panel">
       <State {...result}>

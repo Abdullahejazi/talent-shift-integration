@@ -128,12 +128,21 @@ function JobBrowser(){
       <input value={locationValue} onChange={e=>setLocation(e.target.value)} placeholder="Location"/>
       <select value={sourceValue} onChange={e=>setSource(e.target.value)}>
         <option value="">All Sources</option>
-        <option value="Salla">Salla (سلة)</option>
-        <option value="Foodics">Foodics (فودكس)</option>
-        <option value="Jahez">Jahez (جاهز)</option>
-        <option value="Zid">Zid (زد)</option>
-        <option value="LinkedIn">LinkedIn</option>
-        <option value="Workable">Workable (Global)</option>
+        <optgroup label="🏢 Saudi Companies">
+          <option value="Salla">Salla (سلة)</option>
+          <option value="Foodics">Foodics (فودكس)</option>
+          <option value="Jahez">Jahez (جاهز)</option>
+          <option value="Zid">Zid (زد)</option>
+        </optgroup>
+        <optgroup label="📡 Platforms">
+          <option value="WORKABLE">Workable</option>
+          <option value="GREENHOUSE">Greenhouse</option>
+          <option value="LEVER">Lever</option>
+          <option value="RECRUITEE">Recruitee</option>
+          <option value="NAUKRIGULF">Naukrigulf</option>
+          <option value="GULFTALENT">GulfTalent</option>
+          <option value="SAUDIA_AIRLINES">Saudia Airlines (الخطوط السعودية)</option>
+        </optgroup>
       </select>
     </div>
     <section className="panel">

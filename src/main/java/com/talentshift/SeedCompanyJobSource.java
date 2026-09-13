@@ -93,7 +93,7 @@ class SeedCompanyJobSource implements JobSourceClient {
             if (!http(applyUrl)) applyUrl = hostedUrl;
             if (!http(applyUrl)) continue;
             String description = text(item, "descriptionPlain");
-            jobs.add(new CollectedJob(sourceName(), required(item, "id"), required(item, "text"), seed.name(),
+            jobs.add(new CollectedJob("LEVER", required(item, "id"), required(item, "text"), seed.name(),
                     location, text(item.path("categories"), "commitment"), remote, null,
                     text(item.path("categories"), "team"), description, leverLists(item), applyUrl,
                     http(hostedUrl) ? hostedUrl : applyUrl, epoch(item.path("createdAt").asLong(0)),
@@ -112,7 +112,7 @@ class SeedCompanyJobSource implements JobSourceClient {
             String url = text(item, "absolute_url");
             if (!http(url)) continue;
             String description = Jsoup.parse(Objects.toString(text(item, "content"), "")).text();
-            jobs.add(new CollectedJob(sourceName(), item.path("id").asText(), required(item, "title"), seed.name(),
+            jobs.add(new CollectedJob("GREENHOUSE", item.path("id").asText(), required(item, "title"), seed.name(),
                     location, null, remote, null, null, description, null, url, url,
                     instant(text(item, "updated_at")), isSaudi(location) ? "SA" : null));
         }
@@ -140,7 +140,7 @@ class SeedCompanyJobSource implements JobSourceClient {
             String applyUrl = "https://apply.workable.com/" + token + "/j/" + id;
             String type = text(item, "type");
             
-            jobs.add(new CollectedJob(sourceName(), id, title, seed.name(), location, type, remote, null,
+            jobs.add(new CollectedJob("WORKABLE", id, title, seed.name(), location, type, remote, null,
                     null, "", null, applyUrl, seed.careersUrl().toString(), instant(text(item, "published")),
                     isSaudi(location) ? "SA" : null));
         }
@@ -166,7 +166,7 @@ class SeedCompanyJobSource implements JobSourceClient {
                 String applyUrl = text(item, "careers_url");
                 String type = text(item, "employment_type");
                 
-                jobs.add(new CollectedJob(sourceName(), id, title, seed.name(), location, type, remote, null,
+                jobs.add(new CollectedJob("RECRUITEE", id, title, seed.name(), location, type, remote, null,
                         text(item, "department"), "", null, applyUrl, seed.careersUrl().toString(), instant(text(item, "created_at")),
                         isSaudi(location) ? "SA" : null));
             }

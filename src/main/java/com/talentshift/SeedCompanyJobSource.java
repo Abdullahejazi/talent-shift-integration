@@ -69,6 +69,8 @@ class SeedCompanyJobSource implements JobSourceClient {
                 String host = seed.careersUrl().getHost().toLowerCase(Locale.ROOT);
                 if (host.equals("jobs.lever.co")) collectLever(seed, jobs);
                 else if (host.equals("job-boards.greenhouse.io") || host.equals("boards.greenhouse.io")) collectGreenhouse(seed, jobs);
+                else if (host.equals("apply.workable.com")) collectWorkable(seed, jobs);
+                else if (host.endsWith("recruitee.com") || host.equals("careers.zid.sa") || host.equals("zid.recruitee.com")) collectRecruitee(seed, jobs);
                 else collectHtml(seed, jobs);
             } catch (RuntimeException ignored) { }
         }
@@ -112,6 +114,62 @@ class SeedCompanyJobSource implements JobSourceClient {
             jobs.add(new CollectedJob(sourceName(), item.path("id").asText(), required(item, "title"), seed.name(),
                     location, null, remote, null, null, description, null, url, url,
                     instant(text(item, "updated_at")), isSaudi(location) ? "SA" : null));
+        }
+    }
+
+    private void collectWorkable(CompanySeed seed, List<CollectedJob> jobs) {
+        String token = firstPathSegment(seed.careersUrl());
+        URI api = URI.create("https://apply.workable.com/api/v3/accounts/" + token + "/jobs");
+        if (!loadRobots(api).allowed(api.getPath())) return;
+        
+        String response = restClient.post().uri(api)
+                .header("User-Agent", USER_AGENT)
+                .header("Content-Type", "application/json")
+                .body("{\"query\":\"\",\"location\":[],\"department\":[],\"worktype\":[],\"remote\":[]}")
+                .retrieve().body(String.class);
+                
+        JsonNode root = read(response);
+        for (JsonNode item : root.path("results")) {
+            String location = text(item.path("location"), "country") + " " + text(item.path("location"), "city");
+            boolean remote = item.path("remote").asBoolean(false) || containsRemote(location);
+            if (!isSaudi(location) && !remote) continue;
+            
+            String id = text(item, "shortcode");
+            String title = text(item, "title");
+            String applyUrl = "https://apply.workable.com/" + token + "/j/" + id;
+            String type = text(item, "type");
+            
+            jobs.add(new CollectedJob(sourceName(), id, title, seed.name(), location, type, remote, null,
+                    null, "", null, applyUrl, seed.careersUrl().toString(), instant(text(item, "published")),
+                    isSaudi(location) ? "SA" : null));
+        }
+    }
+
+    private void collectRecruitee(CompanySeed seed, List<CollectedJob> jobs) {
+        String host = seed.careersUrl().getHost().toLowerCase(Locale.ROOT);
+        String token = host.replace(".recruitee.com", "");
+        if (host.equals("careers.zid.sa") || host.equals("zid.recruitee.com")) token = "zid";
+        
+        URI api = URI.create("https://" + token + ".recruitee.com/api/offers");
+        if (!loadRobots(api).allowed(api.getPath())) return;
+        
+        try {
+            JsonNode root = read(get(api));
+            for (JsonNode item : root.path("offers")) {
+                String location = text(item, "location");
+                boolean remote = item.path("remote").asBoolean(false) || containsRemote(location);
+                if (!isSaudi(location) && !remote) continue;
+                
+                String id = text(item, "id");
+                String title = text(item, "title");
+                String applyUrl = text(item, "careers_url");
+                String type = text(item, "employment_type");
+                
+                jobs.add(new CollectedJob(sourceName(), id, title, seed.name(), location, type, remote, null,
+                        text(item, "department"), "", null, applyUrl, seed.careersUrl().toString(), instant(text(item, "created_at")),
+                        isSaudi(location) ? "SA" : null));
+            }
+        } catch (RuntimeException ignored) {
         }
     }
 

@@ -141,7 +141,7 @@ function JobBrowser(){
           <option value="RECRUITEE">Recruitee</option>
           <option value="NAUKRIGULF">Naukrigulf</option>
           <option value="GULFTALENT">GulfTalent</option>
-          <option value="SAUDIA_AIRLINES">Saudia Airlines (الخطوط السعودية)</option>
+          <option value="Saudia Group">Saudia Airlines (الخطوط السعودية)</option>
         </optgroup>
       </select>
     </div>

@@ -87,7 +87,7 @@ class SeedCompanyJobSource implements JobSourceClient {
             String location = text(item.path("categories"), "location");
             String workplace = text(item, "workplaceType");
             boolean remote = "remote".equalsIgnoreCase(workplace) || containsRemote(location);
-            if (!isSaudi(location) && !remote) continue;
+            if (!isSaudi(location) && !remote && location != null && !location.isBlank()) continue;
             String applyUrl = text(item, "applyUrl");
             String hostedUrl = text(item, "hostedUrl");
             if (!http(applyUrl)) applyUrl = hostedUrl;
@@ -108,7 +108,7 @@ class SeedCompanyJobSource implements JobSourceClient {
         for (JsonNode item : read(get(api)).path("jobs")) {
             String location = text(item.path("location"), "name");
             boolean remote = containsRemote(location);
-            if (!isSaudi(location) && !remote) continue;
+            if (!isSaudi(location) && !remote && location != null && !location.isBlank()) continue;
             String url = text(item, "absolute_url");
             if (!http(url)) continue;
             String description = Jsoup.parse(Objects.toString(text(item, "content"), "")).text();
@@ -135,7 +135,7 @@ class SeedCompanyJobSource implements JobSourceClient {
             String city = Objects.toString(text(item.path("location"), "city"), "");
             String location = (country + " " + city).trim();
             boolean remote = item.path("remote").asBoolean(false) || containsRemote(location);
-            if (!isSaudi(location) && !remote) continue;
+            if (!isSaudi(location) && !remote && !location.isBlank()) continue;
             
             String id = text(item, "shortcode");
             String title = text(item, "title");
@@ -161,7 +161,7 @@ class SeedCompanyJobSource implements JobSourceClient {
             for (JsonNode item : root.path("offers")) {
                 String location = text(item, "location");
                 boolean remote = item.path("remote").asBoolean(false) || containsRemote(location);
-                if (!isSaudi(location) && !remote) continue;
+                if (!isSaudi(location) && !remote && location != null && !location.isBlank()) continue;
                 
                 String id = text(item, "id");
                 String title = text(item, "title");

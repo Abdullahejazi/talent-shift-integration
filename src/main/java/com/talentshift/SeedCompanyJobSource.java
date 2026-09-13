@@ -131,7 +131,9 @@ class SeedCompanyJobSource implements JobSourceClient {
                 
         JsonNode root = read(response);
         for (JsonNode item : root.path("results")) {
-            String location = text(item.path("location"), "country") + " " + text(item.path("location"), "city");
+            String country = Objects.toString(text(item.path("location"), "country"), "");
+            String city = Objects.toString(text(item.path("location"), "city"), "");
+            String location = (country + " " + city).trim();
             boolean remote = item.path("remote").asBoolean(false) || containsRemote(location);
             if (!isSaudi(location) && !remote) continue;
             

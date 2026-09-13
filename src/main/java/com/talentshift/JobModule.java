@@ -628,8 +628,8 @@ class JobRepository {
         String where = """
                 FROM jobs WHERE status='ACTIVE'
                   AND (:keyword='' OR 
-                       word_similarity(lower(title), lower(:keyword)) > 0.3 OR 
-                       word_similarity(lower(company), lower(:keyword)) > 0.3 OR 
+                       word_similarity(lower(title), lower(:keyword)) > 0.5 OR 
+                       word_similarity(lower(company), lower(:keyword)) > 0.5 OR 
                        COALESCE(description,'') ILIKE :keywordLike)
                   AND (:location='' OR COALESCE(location,'') ILIKE :locationLike)
                   AND (:type='' OR COALESCE(employment_type,'') ILIKE :typeLike)

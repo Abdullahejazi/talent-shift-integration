@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+@Component
 class SeedCompanyJobSource implements JobSourceClient {
     private static final String USER_AGENT = "TalentShiftJobCollector/1.0 (+public-career-board; contact=site-admin)";
     private static final Pattern SAUDI_LOCATION = Pattern.compile(

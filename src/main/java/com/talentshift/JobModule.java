@@ -633,7 +633,7 @@ class JobRepository {
                        COALESCE(description,'') ILIKE :keywordLike)
                   AND (:location='' OR COALESCE(location,'') ILIKE :locationLike)
                   AND (:type='' OR COALESCE(employment_type,'') ILIKE :typeLike)
-                  AND (:source='' OR source=upper(:source))
+                  AND (:source='' OR source=upper(:source) OR lower(company)=lower(:source))
                   AND (:remote IS NULL OR remote=:remote)
                 """;
         long total = bind(jdbc.sql("SELECT count(*) " + where), k, l, t, s, remote).query(Long.class).single();

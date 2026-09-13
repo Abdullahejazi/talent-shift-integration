@@ -421,6 +421,10 @@ class SaudiJobPolicy {
 
         if ("SA".equalsIgnoreCase(job.countryCode())) return true;
         if (SAUDI_MARKERS.stream().anyMatch(location::contains)) return true;
+        
+        if (job.remote()) return true;
+        if (location.contains("remote") || location.contains("anywhere") || location.contains("worldwide") || title.contains("remote")) return true;
+
         return false;
     }
 

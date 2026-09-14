@@ -114,6 +114,7 @@ function Page({id}){switch(id){
 function PageHead({title,subtitle,actions}){return <div className="page-head"><div><h1>{title}</h1><p>{subtitle}</p></div>{actions&&<div className="page-actions">{actions}</div>}</div>}
 function Stat({label,value,detail,icon:Icon=Activity}){return <div className="metric"><span className="metric-icon"><Icon/></span><div><small>{label}</small><strong>{value??'—'}</strong><span>{detail}</span></div></div>}
 function State({loading,error,children}){if(loading)return <div className="state-card">Loading current data…</div>;if(error)return <div className="state-card error"><XCircle/> {error}</div>;return children}
+function JobRows({jobs}){if(!jobs.length)return <div className="state-card">No jobs matched this view.</div>;return <div className="job-list">{jobs.map(job=><article className="job-row" key={job.id}><div className="company-tile">{(job.company||job.organization_name||'T')[0]}</div><div className="job-main"><h3>{job.title}</h3><p>{job.company||job.organization_name} · {job.location||'Location flexible'}</p><div className="chips"><span>{job.employmentType||job.employment_type||'Open role'}</span>{job.category&&<span style={{background:'var(--surface-alt)',color:'var(--foreground)'}}>{job.category}</span>}<span style={{background: 'var(--primary)', color: 'var(--primary-foreground)'}}>{job.source === 'SEED_COMPANIES' ? (job.company || 'Local Seed') : (job.source||'Verified source')}</span><span style={{background:'var(--surface-alt)',color:'var(--muted)'}}><FileClock style={{width:'0.8rem',height:'0.8rem',display:'inline',marginRight:'4px'}}/>{date(job.collectedAt||job.created_at)}</span></div></div><div className="job-actions"><a className="btn btn-primary" href={job.applyUrl||job.apply_url||job.canonical_application_url} target="_blank" rel="noreferrer">Open application link</a></div></article>)}</div>}
 
 function Jobs(){
   return <><PageHead title="Job Database Preview" subtitle="Search and browse all verified active jobs currently held in the Hub." actions={<button className="btn btn-primary" onClick={()=>location.hash='candidates'}><CircleUserRound style={{width:'1rem',height:'1rem',marginRight:'0.35rem'}}/> View CV Candidates</button>}/><JobBrowser/></>;
@@ -123,16 +124,26 @@ function JobBrowser(){
   const[q,setQ]=useState('');
   const[locationValue,setLocation]=useState('');
   const[sourceValue,setSource]=useState('');
+  const[typeValue,setType]=useState('');
+  const[categoryValue,setCategory]=useState('');
   const[page,setPage]=useState(0);
-  const params=useMemo(()=>({keyword:q,location:locationValue,source:sourceValue,remote:false,page,size:10}),[q,locationValue,sourceValue,page]);
-  const result=useLoad(()=>api.fetchJobs(params),[q,locationValue,sourceValue,page]);
-  useEffect(()=>setPage(0),[q,locationValue,sourceValue]);
+  const params=useMemo(()=>({keyword:q,location:locationValue,source:sourceValue,type:typeValue,category:categoryValue,remote:false,page,size:10}),[q,locationValue,sourceValue,typeValue,categoryValue,page]);
+  const result=useLoad(()=>api.fetchJobs(params),[q,locationValue,sourceValue,typeValue,categoryValue,page]);
+  useEffect(()=>setPage(0),[q,locationValue,sourceValue,typeValue,categoryValue]);
   const totalPages=result.data?.total?Math.ceil(result.data.total/10):0;
   return <>
     <div className="search-rail">
       <Search/>
       <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search roles or skills"/>
       <input value={locationValue} onChange={e=>setLocation(e.target.value)} placeholder="Location"/>
+      <select value={typeValue} onChange={e=>setType(e.target.value)} style={{maxWidth:'140px'}}>
+        <option value="">All Types</option>
+        <option value="Full-time">Full-time</option>
+        <option value="Part-time">Part-time</option>
+        <option value="Contract">Contract</option>
+        <option value="Hybrid">Hybrid</option>
+      </select>
+      <input value={categoryValue} onChange={e=>setCategory(e.target.value)} placeholder="Department/Category" style={{maxWidth:'160px'}}/>
       <select value={sourceValue} onChange={e=>setSource(e.target.value)}>
         <option value="">All Sources</option>
         <optgroup label="🏢 Saudi Companies">
@@ -140,6 +151,12 @@ function JobBrowser(){
           <option value="Foodics">Foodics (فودكس)</option>
           <option value="Jahez">Jahez (جاهز)</option>
           <option value="Zid">Zid (زد)</option>
+          <option value="Lean Technologies">Lean (لين التقنية)</option>
+          <option value="Tamara">Tamara (تمارا)</option>
+          <option value="Tabby">Tabby (تابي)</option>
+          <option value="Noon">Noon (نون)</option>
+          <option value="Mozn">Mozn (مزن)</option>
+          <option value="Unifonic">Unifonic (يونيفونيك)</option>
         </optgroup>
         <optgroup label="📡 Platforms">
           <option value="WORKABLE">Workable</option>

@@ -143,11 +143,11 @@ class ArbeitnowJobSource implements JobSourceClient {
     private final Duration refreshInterval;
 
     ArbeitnowJobSource(RestClient restClient, ObjectMapper mapper,
-            @Value("${app.jobs.max-pages-per-source:3}") int maxPages,
+            @Value("${app.jobs.max-pages-per-source:20}") int maxPages,
             @Value("${app.jobs.arbeitnow-refresh-minutes:15}") long refreshMinutes) {
         this.restClient = restClient;
         this.mapper = mapper;
-        this.maxPages = Math.max(1, Math.min(maxPages, 10));
+        this.maxPages = Math.max(1, Math.min(maxPages, 50));
         this.refreshInterval = Duration.ofMinutes(Math.max(5, refreshMinutes));
     }
 
@@ -621,8 +621,8 @@ class JobRepository {
         return value == null ? null : OffsetDateTime.ofInstant(value, java.time.ZoneOffset.UTC);
     }
 
-    JobPage search(String keyword, String location, String type, String source, Boolean remote, int page, int size) {
-        String k = normalize(keyword), l = normalize(location), t = normalize(type), s = normalize(source);
+    JobPage search(String keyword, String location, String type, String source, String category, Boolean remote, int page, int size) {
+        String k = normalize(keyword), l = normalize(location), t = normalize(type), s = normalize(source), c = normalize(category);
         int safeSize = Math.max(1, Math.min(size, 100));
         int safePage = Math.max(0, page);
         String where = """
@@ -633,10 +633,11 @@ class JobRepository {
                        COALESCE(description,'') ILIKE :keywordLike)
                   AND (:location='' OR COALESCE(location,'') ILIKE :locationLike)
                   AND (:type='' OR COALESCE(employment_type,'') ILIKE :typeLike)
+                  AND (:category='' OR COALESCE(category,'') ILIKE :categoryLike)
                   AND (:source='' OR source=upper(:source) OR lower(company)=lower(:source))
                   AND (:remote IS NULL OR remote=:remote)
                 """;
-        long total = bind(jdbc.sql("SELECT count(*) " + where), k, l, t, s, remote).query(Long.class).single();
+        long total = bind(jdbc.sql("SELECT count(*) " + where), k, l, t, s, c, remote).query(Long.class).single();
         
         String orderBy = k.isEmpty() 
             ? "ORDER BY posted_at DESC NULLS LAST, collected_at DESC" 
@@ -646,7 +647,7 @@ class JobRepository {
                 SELECT id, source, title, company, location, country_code, employment_type, remote, salary, category,
                        description, requirements, apply_url, source_url, posted_at, collected_at
                 """ + where + " " + orderBy + " LIMIT :limit OFFSET :offset"),
-                k, l, t, s, remote).param("limit", safeSize).param("offset", safePage * safeSize)
+                k, l, t, s, c, remote).param("limit", safeSize).param("offset", safePage * safeSize)
                 .query(JobRepository::mapJob).list();
         return new JobPage(items, total, safePage, safeSize);
     }
@@ -678,10 +679,11 @@ class JobRepository {
     }
 
     private static JdbcClient.StatementSpec bind(JdbcClient.StatementSpec statement, String keyword,
-            String location, String type, String source, Boolean remote) {
+            String location, String type, String source, String category, Boolean remote) {
         return statement.param("keyword", keyword).param("keywordLike", "%" + keyword + "%")
                 .param("location", location).param("locationLike", "%" + location + "%")
                 .param("type", type).param("typeLike", "%" + type + "%")
+                .param("category", category).param("categoryLike", "%" + category + "%")
                 .param("source", source).param("remote", remote, Types.BOOLEAN);
     }
 
@@ -979,9 +981,10 @@ class JobController {
     @GetMapping("/jobs")
     JobPage jobs(@RequestParam(defaultValue="") String keyword, @RequestParam(defaultValue="") String location,
             @RequestParam(defaultValue="") String type, @RequestParam(defaultValue="") String source,
+            @RequestParam(defaultValue="") String category,
             @RequestParam(required=false) Boolean remote, @RequestParam(defaultValue="0") int page,
             @RequestParam(defaultValue="20") int size) {
-        return jobs.search(keyword, location, type, source, remote, page, size);
+        return jobs.search(keyword, location, type, source, category, remote, page, size);
     }
 
     @GetMapping("/jobs/{id}")

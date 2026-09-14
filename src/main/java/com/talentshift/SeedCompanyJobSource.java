@@ -112,8 +112,14 @@ class SeedCompanyJobSource implements JobSourceClient {
             String url = text(item, "absolute_url");
             if (!http(url)) continue;
             String description = Jsoup.parse(Objects.toString(text(item, "content"), "")).text();
+            
+            String department = null;
+            if (item.path("departments").isArray() && !item.path("departments").isEmpty()) {
+                department = text(item.path("departments").get(0), "name");
+            }
+            
             jobs.add(new CollectedJob("GREENHOUSE", item.path("id").asText(), required(item, "title"), seed.name(),
-                    location, null, remote, null, null, description, null, url, url,
+                    location, null, remote, null, department, description, null, url, url,
                     instant(text(item, "updated_at")), isSaudi(location) ? "SA" : null));
         }
     }
@@ -141,9 +147,11 @@ class SeedCompanyJobSource implements JobSourceClient {
             String title = text(item, "title");
             String applyUrl = "https://apply.workable.com/" + token + "/j/" + id;
             String type = text(item, "type");
+            String workplace = text(item, "workplace");
+            if ("hybrid".equalsIgnoreCase(workplace)) type = (type != null && !type.isBlank()) ? type + " (Hybrid)" : "Hybrid";
             
             jobs.add(new CollectedJob("WORKABLE", id, title, seed.name(), location, type, remote, null,
-                    null, "", null, applyUrl, seed.careersUrl().toString(), instant(text(item, "published")),
+                    text(item, "department"), "", null, applyUrl, seed.careersUrl().toString(), instant(text(item, "published")),
                     isSaudi(location) ? "SA" : null));
         }
     }

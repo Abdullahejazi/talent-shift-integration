@@ -4,7 +4,7 @@ import {
   Activity, Archive, BriefcaseBusiness, ChevronRight,
   CircleUserRound, Database, ListChecks, LogOut,
   Moon, Play, RefreshCw, Search, ShieldCheck,
-  Sparkles, Sun, Workflow, XCircle
+  Sparkles, Sun, Workflow, XCircle, FileClock
 } from 'lucide-react';
 import * as api from './api';
 import Candidates from './Candidates';

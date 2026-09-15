@@ -619,11 +619,46 @@ class GitHubCandidateSource implements CandidateSourceClient {
         return Math.max(1, (Math.min(repos / 10, 5) + age) / 2);
     }
 
+    private static final List<String> COMMON_SKILLS = List.of(
+        // Tech & Engineering
+        "React", "Vue", "Angular", "Node.js", "Django", "Spring Boot", "Spring", "Docker", "Kubernetes", "AWS", "GCP", "Azure", "Git",
+        "Python", "Java", "JavaScript", "TypeScript", "C++", "C#", "Go", "Rust", "Ruby", "PHP", "Swift", "Kotlin", "Dart", "Flutter",
+        "SQL", "MySQL", "PostgreSQL", "MongoDB", "Redis", "Elasticsearch", "GraphQL", "REST API",
+        "Machine Learning", "AI", "Data Science", "Pandas", "TensorFlow", "PyTorch",
+        "Linux", "CI/CD", "Jenkins", "GitHub Actions", "Terraform", "Ansible",
+        "HTML", "CSS", "Sass", "TailwindCSS", "Next.js", "Nuxt", "Svelte", "Express.js", "NestJS",
+        "Laravel", "Ruby on Rails", "Flask", "FastAPI", ".NET",
+        "Blockchain", "Web3", "Solidity",
+        
+        // Product, Design & Agile
+        "Figma", "UI/UX", "Scrum", "Agile", "Jira", "Product Management", "Project Management", "Kanban",
+        
+        // Marketing & Sales
+        "SEO", "SEM", "Content Marketing", "Digital Marketing", "Social Media", "B2B Sales", "B2C Sales", 
+        "CRM", "HubSpot", "Salesforce", "Copywriting", "Email Marketing", "Growth Hacking", "Google Analytics",
+        
+        // Finance & Accounting
+        "Accounting", "Financial Analysis", "Bookkeeping", "Financial Modeling", "Auditing", "Taxation", "Excel",
+        "ERP", "SAP", "Oracle",
+        
+        // HR & Operations
+        "Human Resources", "Recruitment", "Talent Acquisition", "Employee Relations", "Payroll", "Onboarding",
+        "Operations Management", "Supply Chain", "Logistics", "Procurement",
+        
+        // General Business & Soft Skills
+        "Business Development", "Customer Success", "Customer Support", "Strategic Planning", "Leadership",
+        "Public Speaking", "Data Entry", "Administration"
+    );
+
     static String[] buildSkills(List<String> langs, String bio) {
         Set<String> skills = new LinkedHashSet<>(langs);
-        if (bio != null) for (String kw : List.of(
-            "React","Vue","Angular","Node.js","Django","Spring","Docker","Kubernetes","AWS","GCP","Azure","Git")) {
-            if (bio.contains(kw)) skills.add(kw);
+        if (bio != null) {
+            String lowerBio = bio.toLowerCase(java.util.Locale.ROOT);
+            for (String kw : COMMON_SKILLS) {
+                if (lowerBio.contains(kw.toLowerCase(java.util.Locale.ROOT))) {
+                    skills.add(kw);
+                }
+            }
         }
         return skills.toArray(new String[0]);
     }

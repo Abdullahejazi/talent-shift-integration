@@ -39,7 +39,7 @@ class WorkspaceController {
               j.description,j.requirements,j.apply_url,j.source_url,j.posted_at,j.collected_at
             FROM user_saved_jobs s JOIN jobs j ON j.id=s.job_id
             WHERE s.user_id=:user AND j.status='ACTIVE' ORDER BY s.saved_at DESC
-            """).param("user",user).query((rs,n)->new JobView(rs.getObject("id",UUID.class),rs.getString("source"),rs.getString("title"),rs.getString("company"),rs.getString("location"),rs.getString("country_code"),rs.getString("employment_type"),rs.getBoolean("remote"),rs.getString("salary"),rs.getString("category"),rs.getString("description"),rs.getString("requirements"),rs.getString("apply_url"),rs.getString("source_url"),instant(rs.getObject("posted_at",OffsetDateTime.class)),instant(rs.getObject("collected_at",OffsetDateTime.class)))).list();}
+            """).param("user",user).query((rs,n)->new JobView(rs.getObject("id",UUID.class),rs.getString("source"),rs.getString("title"),rs.getString("company"),rs.getString("location"),rs.getString("country_code"),rs.getString("employment_type"),rs.getBoolean("remote"),rs.getString("salary"),rs.getString("category"),rs.getString("description"),rs.getString("requirements"),rs.getString("apply_url"),rs.getString("source_url"),instant(rs.getObject("posted_at",OffsetDateTime.class)),instant(rs.getObject("collected_at",OffsetDateTime.class)), List.of())).list();}
 
     @PostMapping("/saved-jobs/{jobId}") @ResponseStatus(HttpStatus.NO_CONTENT)
     void save(Authentication authentication,@PathVariable UUID jobId){jdbc.sql("INSERT INTO user_saved_jobs(user_id,job_id) VALUES (:user,:job) ON CONFLICT DO NOTHING").param("user",user(authentication)).param("job",jobId).update();}

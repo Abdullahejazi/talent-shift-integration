@@ -6,6 +6,8 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import org.springframework.beans.factory.annotation.Value;
@@ -162,7 +164,7 @@ class JobEnrichmentService {
             }
             String category=category(job.title());String level=level(job.title());String summary=summarize(currentDesc);
             String skillsJson = "[]";
-            try { skillsJson = MAPPER.writeValueAsString(extractSkills(currentDesc)); } catch (Exception ignored) {}
+            try { skillsJson = MAPPER.writeValueAsString(extractSkills(job.title(), currentDesc)); } catch (Exception ignored) {}
             jdbc.sql("""
                     UPDATE jobs SET normalized_category=:category,experience_level=:level,summary_en=:summary,
                       description=COALESCE(description, :newDesc), skills_json=:skills::jsonb,
@@ -191,13 +193,12 @@ class JobEnrichmentService {
         "Business Development", "Customer Success", "Customer Support", "Strategic Planning", "Leadership",
         "Public Speaking", "Data Entry", "Administration"
     );
-    private static Set<String> extractSkills(String desc) {
+    private static Set<String> extractSkills(String title, String desc) {
         Set<String> skills = new LinkedHashSet<>();
-        if (desc != null) {
-            String lower = desc.toLowerCase(Locale.ROOT);
-            for (String kw : COMMON_SKILLS) {
-                if (lower.contains(kw.toLowerCase(Locale.ROOT))) skills.add(kw);
-            }
+        String textToSearch = (title == null ? "" : title) + " " + (desc == null ? "" : desc);
+        String lower = textToSearch.toLowerCase(Locale.ROOT);
+        for (String kw : COMMON_SKILLS) {
+            if (lower.contains(kw.toLowerCase(Locale.ROOT))) skills.add(kw);
         }
         return skills;
     }

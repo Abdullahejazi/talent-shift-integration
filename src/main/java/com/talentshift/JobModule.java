@@ -48,9 +48,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
 record JobView(UUID id, String source, String title, String company, String location, String countryCode,
-        String employmentType, boolean remote, String salary, String category,
+        String employmentType, Boolean remote, String salary, String category,
         String description, String requirements, String applyUrl, String sourceUrl,
-        Instant postedAt, Instant collectedAt) {}
+        Instant postedAt, Instant collectedAt, List<String> skills) {
+    JobView { skills = skills == null ? List.of() : List.copyOf(skills); }
+}
 record JobPage(List<JobView> items, long total, int page, int size) {}
 record JobCount(long count, int targetMinimum, boolean targetMet, Instant lastCollectedAt) {}
 record CollectionSummary(int inserted, int updated, int rejected, long activeJobs, int targetMinimum,
@@ -645,7 +647,7 @@ class JobRepository {
             
         List<JobView> items = bind(jdbc.sql("""
                 SELECT id, source, title, company, location, country_code, employment_type, remote, salary, category,
-                       description, requirements, apply_url, source_url, posted_at, collected_at
+                       description, requirements, apply_url, source_url, posted_at, collected_at, skills_json
                 """ + where + " " + orderBy + " LIMIT :limit OFFSET :offset"),
                 k, l, t, s, c, remote).param("limit", safeSize).param("offset", safePage * safeSize)
                 .query(JobRepository::mapJob).list();
@@ -655,7 +657,7 @@ class JobRepository {
     Optional<JobView> find(UUID id) {
         return jdbc.sql("""
                 SELECT id, source, title, company, location, country_code, employment_type, remote, salary, category,
-                       description, requirements, apply_url, source_url, posted_at, collected_at
+                       description, requirements, apply_url, source_url, posted_at, collected_at, skills_json
                 FROM jobs WHERE id=:id AND status='ACTIVE' AND saudi_relevant=true
                 """).param("id", id).query(JobRepository::mapJob).optional();
     }
@@ -672,7 +674,7 @@ class JobRepository {
     List<JobView> latest(int limit) {
         return jdbc.sql("""
                 SELECT id, source, title, company, location, country_code, employment_type, remote, salary, category,
-                       description, requirements, apply_url, source_url, posted_at, collected_at
+                       description, requirements, apply_url, source_url, posted_at, collected_at, skills_json
                 FROM jobs WHERE status='ACTIVE' AND saudi_relevant=true
                 ORDER BY posted_at DESC NULLS LAST, collected_at DESC LIMIT :limit
                 """).param("limit", limit).query(JobRepository::mapJob).list();
@@ -716,10 +718,19 @@ class JobRepository {
                 rs.getBoolean("remote"), rs.getString("salary"), rs.getString("category"),
                 rs.getString("description"), rs.getString("requirements"), rs.getString("apply_url"),
                 rs.getString("source_url"), toInstant(rs.getObject("posted_at", OffsetDateTime.class)),
-                toInstant(rs.getObject("collected_at", OffsetDateTime.class)));
+                toInstant(rs.getObject("collected_at", OffsetDateTime.class)),
+                parseSkills(rs.getString("skills_json")));
     }
     private static Instant toInstant(OffsetDateTime value) {
         return value == null ? null : value.toInstant();
+    }
+    private static List<String> parseSkills(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     enum UpsertResult { INSERTED, UPDATED }

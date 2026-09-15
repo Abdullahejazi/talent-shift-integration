@@ -143,6 +143,7 @@ class JobDeduplicationService {
 class JobEnrichmentService {
     private final JdbcClient jdbc;
     private final int batchSize;
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
     JobEnrichmentService(JdbcClient jdbc,@Value("${app.jobs.enrichment-batch-size:100}") int batchSize){
         this.jdbc=jdbc;this.batchSize=Math.max(1,Math.min(batchSize,500));
     }
@@ -160,16 +161,47 @@ class JobEnrichmentService {
                 try { currentDesc = org.jsoup.Jsoup.connect(job.applyUrl()).userAgent("Mozilla/5.0").timeout(5000).get().body().text(); } catch(Exception ignored) {}
             }
             String category=category(job.title());String level=level(job.title());String summary=summarize(currentDesc);
+            String skillsJson = "[]";
+            try { skillsJson = MAPPER.writeValueAsString(extractSkills(currentDesc)); } catch (Exception ignored) {}
             jdbc.sql("""
                     UPDATE jobs SET normalized_category=:category,experience_level=:level,summary_en=:summary,
-                      description=COALESCE(description, :newDesc),
+                      description=COALESCE(description, :newDesc), skills_json=:skills::jsonb,
                       enrichment_status='COMPLETE' WHERE id=:id
-                    """).param("category",category).param("level",level).param("summary",summary).param("newDesc",currentDesc).param("id",job.id()).update();
+                    """).param("category",category).param("level",level).param("summary",summary).param("skills",skillsJson).param("newDesc",currentDesc).param("id",job.id()).update();
         }catch(RuntimeException e){jdbc.sql("UPDATE jobs SET enrichment_status=CASE WHEN enrichment_attempts>=3 THEN 'FAILED' ELSE 'PENDING' END WHERE id=:id").param("id",job.id()).update();}
     }
     private static String category(String title){String t=title.toLowerCase(Locale.ROOT);if(t.matches(".*(software|developer|engineer|data|cloud|security|it).*"))return "Technology";if(t.matches(".*(finance|account|audit|bank).*"))return "Finance";if(t.matches(".*(sales|marketing|business development).*"))return "Sales & Marketing";if(t.matches(".*(health|nurse|doctor|medical).*"))return "Healthcare";return "Other";}
     private static String level(String title){String t=title.toLowerCase(Locale.ROOT);if(t.matches(".*(intern|trainee|graduate).*"))return "Entry";if(t.matches(".*(senior|lead|principal|manager|director|head|chief).*"))return "Senior";return "Mid-level";}
     private static String summarize(String value){if(value==null||value.isBlank())return null;String clean=value.replaceAll("\\s+"," ").trim();return clean.length()<=500?clean:clean.substring(0,497)+"...";}
+    
+    private static final List<String> COMMON_SKILLS = List.of(
+        "React", "Vue", "Angular", "Node.js", "Django", "Spring Boot", "Spring", "Docker", "Kubernetes", "AWS", "GCP", "Azure", "Git",
+        "Python", "Java", "JavaScript", "TypeScript", "C++", "C#", "Go", "Rust", "Ruby", "PHP", "Swift", "Kotlin", "Dart", "Flutter",
+        "SQL", "MySQL", "PostgreSQL", "MongoDB", "Redis", "Elasticsearch", "GraphQL", "REST API",
+        "Machine Learning", "AI", "Data Science", "Pandas", "TensorFlow", "PyTorch",
+        "Linux", "CI/CD", "Jenkins", "GitHub Actions", "Terraform", "Ansible",
+        "HTML", "CSS", "Sass", "TailwindCSS", "Next.js", "Nuxt", "Svelte", "Express.js", "NestJS",
+        "Laravel", "Ruby on Rails", "Flask", "FastAPI", ".NET", "Blockchain", "Web3", "Solidity",
+        "Figma", "UI/UX", "Scrum", "Agile", "Jira", "Product Management", "Project Management", "Kanban",
+        "SEO", "SEM", "Content Marketing", "Digital Marketing", "Social Media", "B2B Sales", "B2C Sales", 
+        "CRM", "HubSpot", "Salesforce", "Copywriting", "Email Marketing", "Growth Hacking", "Google Analytics",
+        "Accounting", "Financial Analysis", "Bookkeeping", "Financial Modeling", "Auditing", "Taxation", "Excel",
+        "ERP", "SAP", "Oracle", "Human Resources", "Recruitment", "Talent Acquisition", "Employee Relations", 
+        "Payroll", "Onboarding", "Operations Management", "Supply Chain", "Logistics", "Procurement",
+        "Business Development", "Customer Success", "Customer Support", "Strategic Planning", "Leadership",
+        "Public Speaking", "Data Entry", "Administration"
+    );
+    private static Set<String> extractSkills(String desc) {
+        Set<String> skills = new LinkedHashSet<>();
+        if (desc != null) {
+            String lower = desc.toLowerCase(Locale.ROOT);
+            for (String kw : COMMON_SKILLS) {
+                if (lower.contains(kw.toLowerCase(Locale.ROOT))) skills.add(kw);
+            }
+        }
+        return skills;
+    }
+    
     private record Pending(UUID id,String title,String description,String applyUrl){}
 }
 

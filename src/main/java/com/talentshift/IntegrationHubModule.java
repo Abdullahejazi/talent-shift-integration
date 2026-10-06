@@ -70,18 +70,24 @@ class IntegrationHubService {
                 String payload=json.writeValueAsString(record);
                 String checksum=hex(MessageDigest.getInstance("SHA-256").digest(payload.getBytes(StandardCharsets.UTF_8)));
                 String status=acceptedKeys.contains(record.dedupKey())?"ACCEPTED":"REJECTED";
-                UUID rawId=db.queryForObject("""
-                        INSERT INTO raw_job_records(import_batch_id,connected_system_id,external_record_id,payload,checksum,processing_status,rejection_reason)
-                        VALUES (?,?,?,?::jsonb,?,?,?) RETURNING id
-                        """,UUID.class,batchId,systemId,record.externalId(),payload,checksum,status,
-                        "REJECTED".equals(status)?"Did not pass the Saudi/direct-link collection policy":null);
-                if ("ACCEPTED".equals(status)) {
-                    List<UUID> jobIds=db.queryForList("SELECT id FROM jobs WHERE source=? AND external_id=? LIMIT 1",UUID.class,record.source(),record.externalId());
-                    if(!jobIds.isEmpty())db.update("""
-                            INSERT INTO job_lineage_observations(job_id,raw_record_id,observation_type,observed_url,details)
-                            VALUES (?,?, 'COLLECTED',?,jsonb_build_object('sourceName',?))
-                            """,jobIds.getFirst(),rawId,record.applyUrl(),sourceName);
+                if ("REJECTED".equals(status)) { continue; } // Skip saving rejected payload
+                
+                UUID rawId;
+                var existing = db.queryForList("SELECT id FROM raw_job_records WHERE checksum = ? LIMIT 1", UUID.class, checksum);
+                if (!existing.isEmpty()) {
+                    rawId = existing.getFirst();
+                } else {
+                    rawId=db.queryForObject("""
+                            INSERT INTO raw_job_records(import_batch_id,connected_system_id,external_record_id,payload,checksum,processing_status,rejection_reason)
+                            VALUES (?,?,?,?::jsonb,?,?,?) RETURNING id
+                            """,UUID.class,batchId,systemId,record.externalId(),payload,checksum,status, null);
                 }
+                
+                List<UUID> jobIds=db.queryForList("SELECT id FROM jobs WHERE source=? AND external_id=? LIMIT 1",UUID.class,record.source(),record.externalId());
+                if(!jobIds.isEmpty())db.update("""
+                        INSERT INTO job_lineage_observations(job_id,raw_record_id,observation_type,observed_url,details)
+                        VALUES (?,?, 'COLLECTED',?,jsonb_build_object('sourceName',?))
+                        """,jobIds.getFirst(),rawId,record.applyUrl(),sourceName);
             } catch (Exception exception) {
                 throw new IllegalStateException("Unable to preserve raw collection record", exception);
             }

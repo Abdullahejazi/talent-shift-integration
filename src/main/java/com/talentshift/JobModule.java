@@ -54,6 +54,8 @@ record JobView(UUID id, String source, String title, String company, String loca
     JobView { skills = skills == null ? List.of() : List.copyOf(skills); }
 }
 record JobPage(List<JobView> items, long total, int page, int size) {}
+record JobFacet(String value, long jobs) {}
+record CompanyFacet(String value, long jobs, boolean registered) {}
 record JobCount(long count, int targetMinimum, boolean targetMet, Instant lastCollectedAt) {}
 record CollectionSummary(int inserted, int updated, int rejected, long activeJobs, int targetMinimum,
         boolean targetMet, List<String> failedSources, Instant startedAt, Instant finishedAt) {}
@@ -623,8 +625,10 @@ class JobRepository {
         return value == null ? null : OffsetDateTime.ofInstant(value, java.time.ZoneOffset.UTC);
     }
 
-    JobPage search(String keyword, String location, String type, String source, String category, Boolean remote, int page, int size) {
-        String k = normalize(keyword), l = normalize(location), t = normalize(type), s = normalize(source), c = normalize(category);
+    JobPage search(String keyword, String location, String type, String source, String company, String category,
+            Boolean remote, int page, int size) {
+        String k = normalize(keyword), l = normalize(location), t = normalize(type), s = normalize(source),
+                co = normalize(company), c = normalize(category);
         int safeSize = Math.max(1, Math.min(size, 100));
         int safePage = Math.max(0, page);
         String where = """
@@ -637,9 +641,10 @@ class JobRepository {
                   AND (:type='' OR COALESCE(employment_type,'') ILIKE :typeLike)
                   AND (:category='' OR COALESCE(category,'') ILIKE :categoryLike)
                   AND (:source='' OR source=upper(:source) OR lower(company)=lower(:source))
+                  AND (:company='' OR lower(company)=lower(:company))
                   AND (:remote IS NULL OR remote=:remote)
                 """;
-        long total = bind(jdbc.sql("SELECT count(*) " + where), k, l, t, s, c, remote).query(Long.class).single();
+        long total = bind(jdbc.sql("SELECT count(*) " + where), k, l, t, s, co, c, remote).query(Long.class).single();
         
         String orderBy = k.isEmpty() 
             ? "ORDER BY posted_at DESC NULLS LAST, collected_at DESC" 
@@ -649,9 +654,45 @@ class JobRepository {
                 SELECT id, source, title, company, location, country_code, employment_type, remote, salary, category,
                        description, requirements, apply_url, source_url, posted_at, collected_at, skills_json
                 """ + where + " " + orderBy + " LIMIT :limit OFFSET :offset"),
-                k, l, t, s, c, remote).param("limit", safeSize).param("offset", safePage * safeSize)
+                k, l, t, s, co, c, remote).param("limit", safeSize).param("offset", safePage * safeSize)
                 .query(JobRepository::mapJob).list();
         return new JobPage(items, total, safePage, safeSize);
+    }
+
+    /** Every source that currently has active jobs, with its active job count. */
+    List<JobFacet> sourceFacets() {
+        return jdbc.sql("""
+                SELECT source, count(*) AS jobs FROM jobs
+                WHERE status='ACTIVE' AND source IS NOT NULL
+                GROUP BY source ORDER BY jobs DESC, source
+                """).query((rs, rowNum) -> new JobFacet(rs.getString("source"), rs.getLong("jobs"))).list();
+    }
+
+    /**
+     * Companies matching {@code query}: those with active jobs plus every registered company or source,
+     * so a registered company that never produced a job still appears with a count of zero.
+     */
+    List<CompanyFacet> companyFacets(String query, int limit) {
+        String q = normalize(query);
+        return jdbc.sql("""
+                SELECT min(value) AS value, CAST(sum(jobs) AS bigint) AS jobs, bool_or(registered) AS registered
+                FROM (
+                    SELECT company AS value, count(*) AS jobs, false AS registered FROM jobs
+                    WHERE status='ACTIVE' AND COALESCE(company,'') <> '' GROUP BY company
+                    UNION ALL
+                    SELECT name, 0, true FROM companies WHERE active=true
+                    UNION ALL
+                    SELECT company_name, 0, true FROM job_sources
+                    WHERE enabled=true AND COALESCE(company_name,'') <> ''
+                ) entries
+                WHERE (:query='' OR value ILIKE :queryLike)
+                GROUP BY lower(value)
+                ORDER BY sum(jobs) DESC, min(value)
+                LIMIT :limit
+                """).param("query", q).param("queryLike", "%" + q + "%")
+                .param("limit", Math.max(1, Math.min(limit, 200)))
+                .query((rs, rowNum) -> new CompanyFacet(rs.getString("value"), rs.getLong("jobs"),
+                        rs.getBoolean("registered"))).list();
     }
 
     Optional<JobView> find(UUID id) {
@@ -681,12 +722,12 @@ class JobRepository {
     }
 
     private static JdbcClient.StatementSpec bind(JdbcClient.StatementSpec statement, String keyword,
-            String location, String type, String source, String category, Boolean remote) {
+            String location, String type, String source, String company, String category, Boolean remote) {
         return statement.param("keyword", keyword).param("keywordLike", "%" + keyword + "%")
                 .param("location", location).param("locationLike", "%" + location + "%")
                 .param("type", type).param("typeLike", "%" + type + "%")
                 .param("category", category).param("categoryLike", "%" + category + "%")
-                .param("source", source).param("remote", remote, Types.BOOLEAN);
+                .param("source", source).param("company", company).param("remote", remote, Types.BOOLEAN);
     }
 
     private static String normalize(String value) { return value == null ? "" : value.trim(); }
@@ -992,10 +1033,19 @@ class JobController {
     @GetMapping("/jobs")
     JobPage jobs(@RequestParam(defaultValue="") String keyword, @RequestParam(defaultValue="") String location,
             @RequestParam(defaultValue="") String type, @RequestParam(defaultValue="") String source,
-            @RequestParam(defaultValue="") String category,
+            @RequestParam(defaultValue="") String company, @RequestParam(defaultValue="") String category,
             @RequestParam(required=false) Boolean remote, @RequestParam(defaultValue="0") int page,
             @RequestParam(defaultValue="20") int size) {
-        return jobs.search(keyword, location, type, source, category, remote, page, size);
+        return jobs.search(keyword, location, type, source, company, category, remote, page, size);
+    }
+
+    @GetMapping("/jobs/facets/sources")
+    List<JobFacet> sourceFacets() { return jobs.sourceFacets(); }
+
+    @GetMapping("/jobs/facets/companies")
+    List<CompanyFacet> companyFacets(@RequestParam(defaultValue="") String q,
+            @RequestParam(defaultValue="50") int limit) {
+        return jobs.companyFacets(q, limit);
     }
 
     @GetMapping("/jobs/{id}")

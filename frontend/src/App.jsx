@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import * as api from './api';
 import Candidates from './Candidates';
+import SearchableSelect from './SearchableSelect';
 import './index.css';
 
 const pageMotion={initial:{opacity:0,y:12},animate:{opacity:1,y:0,transition:{duration:.28}},exit:{opacity:0,y:-8,transition:{duration:.18}}};
@@ -120,16 +121,26 @@ function Jobs(){
   return <><PageHead title="Job Database Preview" subtitle="Search and browse all verified active jobs currently held in the Hub." actions={<button className="btn btn-primary" onClick={()=>location.hash='candidates'}><CircleUserRound style={{width:'1rem',height:'1rem',marginRight:'0.35rem'}}/> View CV Candidates</button>}/><JobBrowser/></>;
 }
 
+const SOURCE_NAMES={ARBEITNOW:'Arbeitnow',REMOTIVE:'Remotive',JOOBLE:'Jooble',NAUKRIGULF:'Naukrigulf',GULFTALENT:'GulfTalent',
+  SAUDIA_AIRLINES:'Saudia Airlines',SEED_COMPANIES:'Seed companies',GREENHOUSE:'Greenhouse',LEVER:'Lever',WORKABLE:'Workable',
+  RECRUITEE:'Recruitee',ASHBY:'Ashby',SMARTRECRUITERS:'SmartRecruiters',WORKDAY:'Workday',BREEZY:'Breezy',LINKEDIN:'LinkedIn',
+  JSON_LD:'Structured data (JSON-LD)',RSS:'RSS feeds',GENERIC_HTML:'Company careers pages',BROWSER_FALLBACK:'Browser fallback'};
+const sourceName=code=>{const raw=String(code||'');const base=raw.startsWith('DIRECT_')?raw.slice(7):raw;return SOURCE_NAMES[base]||base.toLowerCase().replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())};
+const loadSourceOptions=async()=>array(await api.fetchSourceFacets()).map(f=>({value:f.value,label:sourceName(f.value),hint:f.value,count:f.jobs}));
+const loadCompanyOptions=async q=>array(await api.fetchCompanyFacets(q)).map(f=>({value:f.value,count:f.jobs,
+  hint:f.registered?(f.jobs===0?'Registered · no active jobs':'Registered source'):undefined}));
+
 function JobBrowser(){
   const[q,setQ]=useState('');
   const[locationValue,setLocation]=useState('');
   const[sourceValue,setSource]=useState('');
+  const[companyValue,setCompany]=useState('');
   const[typeValue,setType]=useState('');
   const[categoryValue,setCategory]=useState('');
   const[page,setPage]=useState(0);
-  const params=useMemo(()=>({keyword:q,location:locationValue,source:sourceValue,type:typeValue,category:categoryValue,remote:false,page,size:10}),[q,locationValue,sourceValue,typeValue,categoryValue,page]);
-  const result=useLoad(()=>api.fetchJobs(params),[q,locationValue,sourceValue,typeValue,categoryValue,page]);
-  useEffect(()=>setPage(0),[q,locationValue,sourceValue,typeValue,categoryValue]);
+  const params=useMemo(()=>({keyword:q,location:locationValue,source:sourceValue,company:companyValue,type:typeValue,category:categoryValue,remote:false,page,size:10}),[q,locationValue,sourceValue,companyValue,typeValue,categoryValue,page]);
+  const result=useLoad(()=>api.fetchJobs(params),[q,locationValue,sourceValue,companyValue,typeValue,categoryValue,page]);
+  useEffect(()=>setPage(0),[q,locationValue,sourceValue,companyValue,typeValue,categoryValue]);
   const totalPages=result.data?.total?Math.ceil(result.data.total/10):0;
   return <>
     <div className="search-rail">
@@ -144,33 +155,12 @@ function JobBrowser(){
         <option value="Hybrid">Hybrid</option>
       </select>
       <input value={categoryValue} onChange={e=>setCategory(e.target.value)} placeholder="Department/Category" style={{maxWidth:'160px'}}/>
-      <select value={sourceValue} onChange={e=>setSource(e.target.value)}>
-        <option value="">All Sources</option>
-        <optgroup label="🏢 Saudi Companies">
-          <option value="Salla">Salla (سلة)</option>
-          <option value="Foodics">Foodics (فودكس)</option>
-          <option value="Jahez">Jahez (جاهز)</option>
-          <option value="Zid">Zid (زد)</option>
-          <option value="Lean Technologies">Lean (لين التقنية)</option>
-          <option value="Tamara">Tamara (تمارا)</option>
-          <option value="Tabby">Tabby (تابي)</option>
-          <option value="Noon">Noon (نون)</option>
-          <option value="Mozn">Mozn (مزن)</option>
-          <option value="Unifonic">Unifonic (يونيفونيك)</option>
-        </optgroup>
-        <optgroup label="📡 Platforms">
-          <option value="WORKABLE">Workable</option>
-          <option value="GREENHOUSE">Greenhouse</option>
-          <option value="LEVER">Lever</option>
-          <option value="RECRUITEE">Recruitee</option>
-          <option value="NAUKRIGULF">Naukrigulf</option>
-          <option value="GULFTALENT">GulfTalent</option>
-          <option value="Saudia Group">Saudia Airlines (الخطوط السعودية)</option>
-        </optgroup>
-      </select>
+      <SearchableSelect label="Source" allLabel="All sources" placeholder="Search sources" value={sourceValue} onChange={setSource} loadOptions={loadSourceOptions}/>
+      <SearchableSelect label="Company" allLabel="All companies" placeholder="Search companies, e.g. Saudi Tech Corp" value={companyValue} onChange={setCompany} loadOptions={loadCompanyOptions} serverSearch emptyText="No company matches this search"/>
     </div>
     <section className="panel">
       <State {...result}>
+        <div className="results-meta">{(result.data?.total??0).toLocaleString()} matching jobs</div>
         <JobRows jobs={array(result.data)}/>
         {totalPages>1&&<div className="pagination"><button className="btn" disabled={page===0} onClick={()=>setPage(p=>p-1)}>Previous</button><span>Page {page+1} of {totalPages}</span><button className="btn" disabled={page>=totalPages-1} onClick={()=>setPage(p=>p+1)}>Next</button></div>}
       </State>

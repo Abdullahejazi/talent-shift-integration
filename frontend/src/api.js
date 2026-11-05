@@ -52,6 +52,8 @@ const query = values => {
 
 export const fetchJobs = filters => request(`/api/jobs?${query(filters)}`);
 export const fetchJobCount = () => request('/api/jobs/count');
+export const fetchSourceFacets = () => request('/api/jobs/facets/sources');
+export const fetchCompanyFacets = (q='') => request(`/api/jobs/facets/companies?${query({q,limit:50})}`);
 export const fetchRecommendedJobs = () => request('/api/jobs/recommended');
 export const fetchJob = id => request(`/api/jobs/${id}`);
 export const fetchCompanies = (keyword='') => request(`/api/companies?${query({keyword,page:0,size:100})}`);

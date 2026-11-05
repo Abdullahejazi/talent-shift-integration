@@ -6,6 +6,8 @@
   --bg-card: rgba(18, 20, 28, 0.65);
   --bg-card-hover: rgba(22, 25, 34, 0.85);
   --bg-input: rgba(15, 17, 26, 0.7);
+  --bg-popover: #12141c;
+  --bg-option-active: rgba(79, 70, 229, 0.16);
   --border-color: rgba(255, 255, 255, 0.05);
   --border-hover: rgba(255, 255, 255, 0.12);
   
@@ -39,6 +41,8 @@
   --bg-card: rgba(255, 255, 255, 0.85);
   --bg-card-hover: rgba(255, 255, 255, 0.95);
   --bg-input: rgba(255, 255, 255, 0.9);
+  --bg-popover: #ffffff;
+  --bg-option-active: rgba(79, 70, 229, 0.09);
   --border-color: rgba(0, 0, 0, 0.08);
   --border-hover: rgba(0, 0, 0, 0.15);
   
@@ -1615,3 +1619,44 @@ tr:hover td {
 }
 
 
+
+
+/* Searchable select (job filters) */
+.search-rail { flex-wrap:wrap; position:relative; z-index:5; }
+.ss { position:relative; flex:0 1 220px; min-width:180px; }
+.ss-trigger { width:100%; display:flex; align-items:center; gap:.5rem; padding:.45rem 2.2rem .45rem 1rem; min-height:3.1rem;
+  background:var(--bg-input); border:1px solid var(--border-color); border-radius:12px; color:var(--text-h); cursor:pointer; text-align:left;
+  transition:border-color .2s ease, box-shadow .2s ease; }
+.ss-trigger:hover { border-color:var(--border-hover); }
+.ss-trigger:focus-visible, .ss.open .ss-trigger { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(79,70,229,.2); }
+.ss-text { display:grid; min-width:0; line-height:1.25; }
+.ss-text small { font-size:.68rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); }
+.ss-text span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.9rem; }
+.ss.has-value .ss-text span { color:var(--text-h); font-weight:600; }
+.ss-caret { position:absolute; right:.8rem; top:50%; width:1rem; height:1rem; transform:translateY(-50%); color:var(--text-muted); pointer-events:none; transition:transform .2s ease; }
+.ss.open .ss-caret { transform:translateY(-50%) rotate(180deg); }
+.ss.has-value .ss-caret { visibility:hidden; }
+.ss-clear { position:absolute; right:.45rem; top:50%; transform:translateY(-50%); width:1.6rem; height:1.6rem; display:grid; place-items:center;
+  border:0; border-radius:8px; background:transparent; color:var(--text-muted); cursor:pointer; }
+.ss-clear:hover, .ss-clear:focus-visible { color:var(--text-h); background:var(--bg-option-active); outline:none; }
+.ss-clear svg { width:.95rem; height:.95rem; }
+.ss-popover { position:absolute; top:calc(100% + .4rem); right:0; z-index:40; width:min(340px, 92vw); background:var(--bg-popover);
+  border:1px solid var(--border-hover); border-radius:14px; box-shadow:var(--shadow-lg); overflow:hidden; }
+.ss-search { display:flex; align-items:center; gap:.5rem; padding:.55rem .7rem; border-bottom:1px solid var(--border-color); }
+.ss-search svg { width:1rem; height:1rem; flex:none; color:var(--text-muted); }
+.ss-search input { flex:1; min-width:0; padding:.5rem .6rem !important; background:transparent !important; border:0 !important; box-shadow:none !important; }
+.ss-list { list-style:none; margin:0; padding:.35rem; max-height:300px; overflow-y:auto; }
+.ss-option { display:flex; align-items:center; gap:.6rem; padding:.55rem .65rem; border-radius:9px; cursor:pointer; color:var(--text-main); }
+.ss-option.active { background:var(--bg-option-active); color:var(--text-h); }
+.ss-option.selected .ss-option-label { font-weight:600; color:var(--text-h); }
+.ss-option-main { flex:1; min-width:0; display:grid; line-height:1.3; }
+.ss-option-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.9rem; }
+.ss-option-main small { font-size:.72rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ss-count { flex:none; font-size:.75rem; font-weight:600; font-variant-numeric:tabular-nums; padding:.1rem .5rem; border-radius:999px;
+  background:var(--bg-option-active); color:var(--text-h); }
+.ss-count.zero { background:transparent; color:var(--danger); border:1px solid currentColor; }
+.ss-check { width:.95rem; height:.95rem; flex:none; color:var(--primary); }
+.ss-status { padding:.6rem .9rem .8rem; font-size:.8rem; color:var(--text-muted); }
+.ss-status.error { color:var(--danger); }
+.results-meta { margin-bottom:.8rem; font-size:.82rem; color:var(--text-muted); font-variant-numeric:tabular-nums; }
+@media(max-width:760px){ .ss { flex:1 1 100%; } .ss-popover { left:0; right:auto; width:100%; } }
